@@ -16,6 +16,7 @@ import GameLog from '@/components/Game/GameLog';
 import HistoryPanel from '@/components/Game/HistoryPanel';
 import AssassinFloatingButton from '@/components/Game/AssassinFloatingButton';
 import VisionPanel from '@/components/Game/VisionPanel';
+import { ExitGameButton } from '@/components/Game/ExitGameButton';
 
 export default function GamePage() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function GamePage() {
               任务 {gameState.currentQuest}/5 · 投票 {gameState.consecutiveRejects + 1}/5
             </div>
             <QuestTracker />
+              <ExitGameButton />
           </div>
         </div>
 
