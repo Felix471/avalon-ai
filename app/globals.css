@@ -119,7 +119,25 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    /* 将背景图片逻辑整合在这里 */
+    background-image: url('/bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+
+    /* 保留默认背景色作为兜底 (图片下方)
+       如果希望图片完全覆盖颜色，保留这行没问题。
+       如果希望背景图和颜色混合，可以使用 background-blend-mode
+    */
+    @apply bg-background;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    /* 关键：将 body 背景设为透明，让 html 的图片透出来 */
+    @apply bg-transparent text-foreground;
   }
 }

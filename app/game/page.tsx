@@ -36,7 +36,7 @@ export default function GamePage() {
 
   if (!hydrated) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
         <div className="text-white text-xl">正在初始化...</div>
       </div>
     );
@@ -44,7 +44,7 @@ export default function GamePage() {
 
   if (!gameState) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
         <div className="text-white text-xl">正在跳转到大厅...</div>
       </div>
     );
@@ -75,18 +75,27 @@ export default function GamePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+    <main className="min-h-screen bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="max-w-[1600px] mx-auto">
         {/* 顶部状态栏 */}
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-amber-400">🏰 AI 阿瓦隆</h1>
+          {/* Logo 和 标题 */}
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo.jpg"
+              alt="AI 阿瓦隆"
+              className="w-10 h-10 rounded-lg object-cover"
+            />
+            <h1 className="text-2xl font-bold text-amber-400">AI 阿瓦隆</h1>
+          </div>
+
           <div className="flex items-center gap-4">
             {/* 当前轮次和投票次数 */}
             <div className="text-sm text-slate-300 bg-slate-800/50 px-3 py-1 rounded-lg">
               任务 {gameState.currentQuest}/5 · 投票 {gameState.consecutiveRejects + 1}/5
             </div>
             <QuestTracker />
-              <ExitGameButton />
+            <ExitGameButton />
           </div>
         </div>
 

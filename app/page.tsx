@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
-  Users, Play, Bot, Info, AlertTriangle, Heart, Lock, Sparkles
+  Users, Play, Bot, Info, Heart, Lock, Sparkles
 } from 'lucide-react';
 
 // ==================== 验证组件 ====================
@@ -26,7 +26,6 @@ function AuthGate({ onVerified }: { onVerified: () => void }) {
       englishName.trim().toLowerCase() === 'felix';
 
     if (isCorrect) {
-      // 存储验证状态到 sessionStorage（关闭浏览器后失效）
       sessionStorage.setItem('avalon_verified', 'true');
       onVerified();
     } else {
@@ -43,7 +42,7 @@ function AuthGate({ onVerified }: { onVerified: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div
         className={`
           bg-slate-800/80 rounded-2xl border border-slate-700 p-8 max-w-md w-full
@@ -52,9 +51,13 @@ function AuthGate({ onVerified }: { onVerified: () => void }) {
         `}
       >
         {/* 标题 */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🏰</div>
-          <h1 className="text-2xl font-bold text-amber-400 mb-2">AI 阿瓦隆</h1>
+        <div className="flex flex-col items-center justify-center mb-8 gap-3">
+          <img
+             src="/logo.jpg"
+             alt="Logo"
+             className="w-16 h-16 rounded-xl object-cover shadow-lg"
+          />
+          <h1 className="text-2xl font-bold text-amber-400">AI 阿瓦隆</h1>
           <p className="text-slate-400 text-sm">请回答以下问题以验证身份</p>
         </div>
 
@@ -109,7 +112,7 @@ function AuthGate({ onVerified }: { onVerified: () => void }) {
         </div>
       </div>
 
-      {/* shake 动画的 CSS */}
+      {/* shake 动画 */}
       <style jsx global>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -148,7 +151,6 @@ function LobbyContent() {
   };
 
   const handleStartGame = () => {
-    // 至少需要2个模型（可以复用同一个模型扮演多个角色）
     if (config.enabledModels.length < 2) {
       alert('请至少选择 2 个 AI 模型');
       return;
@@ -160,11 +162,18 @@ function LobbyContent() {
   const playerCounts = [5, 6, 7, 8, 9, 10];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+    <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="max-w-4xl mx-auto">
         {/* 标题 */}
         <div className="text-center py-8">
-          <h1 className="text-4xl font-bold text-amber-400 mb-2">🏰 AI 阿瓦隆</h1>
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <img
+              src="/logo.jpg"
+              alt="AI 阿瓦隆"
+              className="w-12 h-12 rounded-lg object-cover"
+            />
+            <h1 className="text-4xl font-bold text-amber-400">AI 阿瓦隆</h1>
+          </div>
           <p className="text-slate-400">与多个 AI 模型一起玩阿瓦隆桌游</p>
         </div>
 
@@ -385,7 +394,7 @@ export default function HomePage() {
   // 等待 hydration 和验证检查
   if (!hydrated || isChecking) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
         <div className="text-white text-xl">正在加载...</div>
       </div>
     );
