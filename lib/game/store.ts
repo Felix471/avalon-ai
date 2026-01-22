@@ -6,7 +6,7 @@ import {
 } from './types';
 import {
   createGame, proposeTeam, submitVote, submitQuestAction,
-  attemptAssassination, addEvent, transitionTo, advanceLeader,
+  attemptAssassination, addEvent, transitionTo,
   shouldHaveDiscussion
 } from './engine';
 
@@ -21,6 +21,7 @@ interface GameStore {
   // 游戏操作
   startGame: () => void;
   resetGame: () => void;
+  clearSavedGame: () => void; // [新增] 清除存档
 
   // 阶段转换
   setPhase: (phase: GamePhase) => void;
@@ -104,16 +105,30 @@ export const useGameStore = create<GameStore>()(
         set({ gameState, pendingVotes: {}, pendingQuestActions: {} });
       },
 
+      // 重置游戏状态，但保留部分配置（通常用于"再来一局"）
       resetGame: () => set({
         gameState: null,
-        config: {
-          ...defaultConfig,
-          variantRules: { ...defaultVariantRules },
-        },
+        // config: defaultConfig, // 这里可以选择是否重置配置，通常玩家希望保留配置
         pendingAIPlayers: [],
         pendingVotes: {},
         pendingQuestActions: {},
       }),
+
+      // [新增] 彻底清除存档并重置所有状态
+      clearSavedGame: () => {
+        // 1. 清除 LocalStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('avalon-game-storage');
+        }
+        // 2. 重置内存状态为默认值
+        set({
+          config: defaultConfig,
+          gameState: null,
+          pendingAIPlayers: [],
+          pendingVotes: {},
+          pendingQuestActions: {},
+        });
+      },
 
       setPhase: (phase) => set(state => ({
         gameState: state.gameState ? transitionTo(state.gameState, phase) : null
@@ -149,8 +164,7 @@ export const useGameStore = create<GameStore>()(
 
       addDiscussion: (playerId, content) => set(state => {
         if (!state.gameState) return state;
-        const player = state.gameState.players.find(p => p.id === playerId);
-        if (!player) return state;
+        // const player = state.gameState.players.find(p => p.id === playerId);
         return {
           gameState: addEvent(state.gameState, {
             type: 'discussion',
@@ -226,9 +240,10 @@ export const useGameStore = create<GameStore>()(
       setPendingAI: (playerIds) => set({ pendingAIPlayers: playerIds }),
     }),
     {
-      name: 'avalon-game-storage',
+      name: 'avalon-game-storage', // 存储 Key
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
+          // SSR 环境返回空实现
           return {
             getItem: () => null,
             setItem: () => {},
@@ -237,6 +252,7 @@ export const useGameStore = create<GameStore>()(
         }
         return localStorage;
       }),
+      // 只持久化 config 和 gameState，忽略 pending 状态和函数
       partialize: (state) => ({
         config: state.config,
         gameState: state.gameState,
@@ -247,7 +263,7 @@ export const useGameStore = create<GameStore>()(
           if (error) {
             console.error('[Zustand] Hydration 错误:', error);
           } else {
-            console.log('[Zustand] Hydration 完成, gameState:', state?.gameState ? '存在' : '空');
+            console.log('[Zustand] Hydration 完成');
           }
           setHydrated();
         };
@@ -258,19 +274,20 @@ export const useGameStore = create<GameStore>()(
 
 // ============ React Hook：等待 Hydration ============
 export function useHydration() {
-  const [hydrated, setHydrated] = useState(hasHydrated);
+  const [hydrated, setHydratedState] = useState(hasHydrated);
 
   useEffect(() => {
+    // 如果已经 hydrated，直接返回 true
     if (hasHydrated) {
-      setHydrated(true);
+      setHydratedState(true);
       return;
     }
 
+    // 否则订阅完成事件
     const unsubscribe = onHydrationComplete(() => {
-      setHydrated(true);
+      setHydratedState(true);
     });
 
-    // 包装成 void 返回值的函数，满足 React useEffect 清理函数的类型要求
     return () => {
       unsubscribe();
     };

@@ -45,7 +45,7 @@ export function ExitGameButton() {
           <DialogHeader>
             <DialogTitle>确认退出游戏？</DialogTitle>
             <DialogDescription className="text-slate-400">
-              游戏进度将不会被保存。在未来会加入保存进度功能。
+              游戏进度会被保存，你可以稍后重新进入游戏。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
