@@ -15,7 +15,8 @@ import { getPlayerVision } from '@/lib/game/engine';
 export function buildDiscussionPrompt(
   gameState: GameState,
   playerId: number,
-  recentSpeeches: Array<{ playerId: number; content: string }>
+  recentSpeeches: Array<{ playerId: number; content: string }>,
+  mode: 'full' | 'naive' = 'full'
 ): string {
   const player = gameState.players.find(p => p.id === playerId)!;
   const role = ROLES[player.role!];
@@ -32,7 +33,14 @@ export function buildDiscussionPrompt(
 
   if (isEvil) {
     // ===== 坏人策略 =====
-    strategyGuide = `
+    if (mode === 'naive') {
+      strategyGuide = `
+【你的阵营】莫德雷德阵营（坏人）
+【核心目标】破坏任务 或 最终刺杀梅林
+
+${vision.teammates.length > 0 ? `【你知道的队友】玩家${vision.teammates.join('、玩家')}是你的坏人队友` : ''}`;
+    } else {
+      strategyGuide = `
 【你的阵营】莫德雷德阵营（坏人）
 【核心目标】破坏任务 或 最终刺杀梅林
 
@@ -60,9 +68,18 @@ ${isAssassinationSoon ? `- 好人即将获胜：注意观察谁可能是梅林
 - 不要直接问"谁是梅林"，而是观察谁的推理过于准确` : ''}
 
 ${vision.teammates.length > 0 ? `【你知道的队友】玩家${vision.teammates.join('、玩家')}是你的坏人队友，但绝对不能在发言中暴露这一点！` : ''}`;
+    }
   } else {
     // ===== 好人策略 =====
-    strategyGuide = `
+    if (mode === 'naive') {
+      strategyGuide = `
+【你的阵营】亚瑟阵营（好人）
+【核心目标】完成3个任务 并 保护梅林不被刺杀
+
+${vision.knownEvil.length > 0 ? `【你看到的坏人】玩家${vision.knownEvil.join('、玩家')}` : ''}
+${vision.knownMerlinOrMorgana.length > 0 ? `【你看到的梅林或莫甘娜】玩家${vision.knownMerlinOrMorgana.join('、玩家')}` : ''}`;
+    } else {
+      strategyGuide = `
 【你的阵营】亚瑟阵营（好人）
 【核心目标】完成3个任务 并 保护梅林不被刺杀
 
@@ -81,6 +98,7 @@ ${player.role === 'loyal' ? `你是忠臣！你没有特殊信息，需要通过
 
 ${vision.knownEvil.length > 0 ? `【你看到的坏人】玩家${vision.knownEvil.join('、玩家')}（注意：不要太直接地暴露这个信息！）` : ''}
 ${vision.knownMerlinOrMorgana.length > 0 ? `【你看到的梅林或莫甘娜】玩家${vision.knownMerlinOrMorgana.join('、玩家')}（你需要判断谁是真梅林）` : ''}`;
+    }
   }
 
   // 游戏状态信息
@@ -119,7 +137,8 @@ ${speechesSection}
 export function buildVotingPrompt(
   gameState: GameState,
   playerId: number,
-  proposedTeam: number[]
+  proposedTeam: number[],
+  mode: 'full' | 'naive' = 'full'
 ): string {
   const player = gameState.players.find(p => p.id === playerId)!;
   const role = ROLES[player.role!];
@@ -132,8 +151,16 @@ export function buildVotingPrompt(
 
   let strategyHint = '';
 
-  if (isEvil) {
-    strategyHint = `
+  if (mode === 'naive') {
+    // Naive baseline: no strategy hints, only vision-based warnings for good
+    if (isEvil) {
+      strategyHint = `\n你是坏人。`;
+    } else {
+      strategyHint = `\n你是好人。${knownEvilInTeam.length > 0 ? `\n注意：队伍中有你知道的坏人（玩家${knownEvilInTeam.join('、玩家')}）。` : ''}`;
+    }
+  } else {
+    if (isEvil) {
+      strategyHint = `
 【你是坏人，投票策略】
 - 如果队伍里没有坏人：倾向于反对（但不要每次都反对，会暴露）
 - 如果队伍里有坏人队友：倾向于同意（让队友有机会破坏任务）
@@ -141,14 +168,15 @@ export function buildVotingPrompt(
 - 偶尔做出"反常"的投票来伪装
 
 队伍中你的队友：${teammatesInTeam.length > 0 ? `玩家${teammatesInTeam.join('、玩家')}` : '无'}`;
-  } else {
-    strategyHint = `
+    } else {
+      strategyHint = `
 【你是好人，投票策略】
 - 如果队伍里有你怀疑的坏人：反对
 - 如果队伍看起来可靠：同意
 - 如果连续否决次数很高：考虑同意一个还行的队伍
 
 ${knownEvilInTeam.length > 0 ? `⚠️ 注意：队伍中有你知道的坏人（玩家${knownEvilInTeam.join('、玩家')}）！` : ''}`;
+    }
   }
 
   return `你正在阿瓦隆游戏中进行投票。
@@ -172,7 +200,8 @@ ${strategyHint}
 
 export function buildQuestActionPrompt(
   gameState: GameState,
-  playerId: number
+  playerId: number,
+  mode: 'full' | 'naive' = 'full'
 ): string {
   const player = gameState.players.find(p => p.id === playerId)!;
   const role = ROLES[player.role!];
@@ -189,13 +218,26 @@ export function buildQuestActionPrompt(
   const teamSize = quest.team?.length || 0;
   const needsDoubleFail = quest.requiresDoubleFail;
 
-  return `你是坏人，正在执行任务。你可以选择让任务成功或失败。
-
-【当前局势】
+  const gameStatus = `【当前局势】
 - 任务进度：好人 ${gameState.goodWins} 胜 / 坏人 ${gameState.evilWins} 胜
 - 当前任务：第 ${gameState.currentQuest} 轮
 - 队伍人数：${teamSize} 人
-${needsDoubleFail ? '- ⚠️ 这个任务需要2张失败票才会失败！' : ''}
+${needsDoubleFail ? '- ⚠️ 这个任务需要2张失败票才会失败！' : ''}`;
+
+  if (mode === 'naive') {
+    return `你是坏人，正在执行任务。你可以选择让任务成功或失败。
+
+${gameStatus}
+
+【输出格式】
+只能输出 SUCCESS（成功）或 FAIL（失败）。
+
+你的选择：`;
+  }
+
+  return `你是坏人，正在执行任务。你可以选择让任务成功或失败。
+
+${gameStatus}
 
 【策略建议】
 - 如果出失败票：任务失败，但你会暴露队伍中有坏人
@@ -216,13 +258,29 @@ ${needsDoubleFail ? '- ⚠️ 这个任务需要2张失败票才会失败！' : 
 
 export function buildAssassinationPrompt(
   gameState: GameState,
-  playerId: number
+  playerId: number,
+  mode: 'full' | 'naive' = 'full'
 ): string {
   const goodPlayers = gameState.players.filter(p => ROLES[p.role!].team === 'good');
 
   // 收集游戏中的线索
   const discussionEvents = gameState.events.filter(e => e.type === 'discussion');
   const voteEvents = gameState.events.filter(e => e.type === 'vote');
+
+  if (mode === 'naive') {
+    return `你是刺客！好人已经完成了3个任务，但你有最后一次机会——找出并刺杀梅林！
+
+【好人玩家列表】
+${goodPlayers.map(p => `玩家${p.id}`).join(', ')}
+
+【回顾一下游戏中的关键发言】
+${discussionEvents.slice(-10).map(e => `玩家${e.playerId}：${e.content.substring(0, 100)}`).join('\n')}
+
+【输出格式】
+只能输出一个玩家编号，例如：3
+
+你要刺杀的玩家编号：`;
+  }
 
   return `你是刺客！好人已经完成了3个任务，但你有最后一次机会——找出并刺杀梅林！
 

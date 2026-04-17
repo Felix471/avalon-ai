@@ -1,0 +1,10 @@
+{
+  "heterogeneous-full": {
+    "n": 2,
+    "goodWinRate": 0.5,
+    "evilWinRate": 0.5,
+    "avgDurationSec": 878.3805,
+    "avgLlmCalls": 134,
+    "avgQuestsCompleted": 3.5
+  }
+}
