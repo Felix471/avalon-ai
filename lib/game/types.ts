@@ -107,42 +107,28 @@ export const AI_MODELS: AIModel[] = [
   // Anthropic
   {
     id: 'claude-sonnet',
-    name: 'Claude Sonnet',
+    name: 'Claude Sonnet 4.6',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     color: '#D97706'
   },
 
   // OpenAI
   {
-    id: 'gpt-4o',
-    name: 'GPT-4o',
+    id: 'gpt',
+    name: 'GPT-5.4 Mini',
     provider: 'openai',
-    model: 'gpt-4o',
-    color: '#10A37F'
-  },
-  {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
-    provider: 'openai',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.4-mini',
     color: '#10A37F'
   },
 
-  // Google - gemini-2.5 系列在 v1beta API 上稳定可用
+  // Google
   {
     id: 'gemini-flash',
     name: 'Gemini 2.5 Flash',
     provider: 'google',
-    model: 'gemini-2.5-flash',  // 2.5 flash 在 v1beta 上可用，配额也更高
+    model: 'gemini-2.5-flash',
     color: '#4285F4'
-  },
-  {
-    id: 'gemini-pro',
-    name: 'Gemini 2.5 Pro',
-    provider: 'google',
-    model: 'gemini-2.5-pro',
-    color: '#EA4335'
   },
 
   // DeepSeek
@@ -157,9 +143,9 @@ export const AI_MODELS: AIModel[] = [
   // xAI - Grok
   {
     id: 'grok',
-    name: 'Grok',
+    name: 'Grok 4',
     provider: 'xai',
-    model: 'grok-3-latest',     // 或者 'grok-beta' 如果你用的是测试版
+    model: 'grok-4-fast-non-reasoning',
     color: '#1DA1F2'
   },
 ];
