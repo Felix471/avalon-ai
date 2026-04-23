@@ -217,6 +217,100 @@ function main() {
   }
   summaryLines.push('');
 
+  // ==================== Extended Behavioral Metrics ====================
+  summaryLines.push('## Extended Behavioral Metrics');
+  summaryLines.push('');
+
+  // --- Metric A: Per-model discussion verbosity (good vs evil) ---
+  const EVIL_ROLES = ['assassin', 'morgana', 'mordred', 'oberon', 'minion'];
+  const verbosity: Record<string, { goodChars: number[]; evilChars: number[] }> = {};
+
+  for (const game of games) {
+    for (const d of game.discussions) {
+      const player = game.players.find(p => p.id === d.speakerId);
+      if (!player) continue;
+      const model = player.model;
+      if (!verbosity[model]) verbosity[model] = { goodChars: [], evilChars: [] };
+      const isEvil = EVIL_ROLES.includes(player.role);
+      if (isEvil) {
+        verbosity[model].evilChars.push(d.content.length);
+      } else {
+        verbosity[model].goodChars.push(d.content.length);
+      }
+    }
+  }
+
+  summaryLines.push('### Discussion Verbosity by Model (Good vs Evil)');
+  summaryLines.push('');
+  summaryLines.push('| Model | Good Avg Chars | Evil Avg Chars | Ratio (Evil/Good) |');
+  summaryLines.push('|-------|---------------|---------------|-------------------|');
+  const verbosityStats: Record<string, { goodAvg: number; evilAvg: number }> = {};
+  for (const [model, v] of Object.entries(verbosity).sort((a, b) => a[0].localeCompare(b[0]))) {
+    const goodAvg = v.goodChars.length > 0 ? v.goodChars.reduce((a, b) => a + b, 0) / v.goodChars.length : 0;
+    const evilAvg = v.evilChars.length > 0 ? v.evilChars.reduce((a, b) => a + b, 0) / v.evilChars.length : 0;
+    const ratio = goodAvg > 0 ? (evilAvg / goodAvg).toFixed(2) : 'N/A';
+    summaryLines.push(`| ${model} | ${goodAvg.toFixed(1)} | ${evilAvg.toFixed(1)} | ${ratio} |`);
+    verbosityStats[model] = { goodAvg: parseFloat(goodAvg.toFixed(1)), evilAvg: parseFloat(evilAvg.toFixed(1)) };
+  }
+  summaryLines.push('');
+
+  // --- Metric B: Per-round evil sabotage timing ---
+  const sabotageByRound: Record<number, { evilOnTeam: number; failCount: number }> = {};
+
+  for (const game of games) {
+    const evilIds = new Set(game.players.filter(p => EVIL_ROLES.includes(p.role)).map(p => p.id));
+    for (const quest of game.quests) {
+      const round = quest.round;
+      if (!sabotageByRound[round]) sabotageByRound[round] = { evilOnTeam: 0, failCount: 0 };
+      for (const [pid, action] of Object.entries(quest.actions)) {
+        if (evilIds.has(parseInt(pid))) {
+          sabotageByRound[round].evilOnTeam++;
+          if (action === 'fail') sabotageByRound[round].failCount++;
+        }
+      }
+    }
+  }
+
+  summaryLines.push('### Evil Sabotage Timing by Quest Round');
+  summaryLines.push('');
+  summaryLines.push('| Quest Round | Evil on Team | Sabotage Count | Sabotage Rate |');
+  summaryLines.push('|------------|-------------|---------------|--------------|');
+  const sabotageRoundStats: Record<string, number> = {};
+  for (let round = 1; round <= 5; round++) {
+    const s = sabotageByRound[round];
+    if (s && s.evilOnTeam > 0) {
+      const rate = s.failCount / s.evilOnTeam;
+      summaryLines.push(`| ${round} | ${s.evilOnTeam} | ${s.failCount} | ${pct(s.failCount, s.evilOnTeam)} |`);
+      sabotageRoundStats[String(round)] = parseFloat(rate.toFixed(4));
+    } else {
+      summaryLines.push(`| ${round} | 0 | 0 | N/A |`);
+      sabotageRoundStats[String(round)] = 0;
+    }
+  }
+  summaryLines.push('');
+
+  // --- Metric C: Per-config self-recommendation count ---
+  const selfRecRegex = /(带上我|我愿意上|选我|让我上)/g;
+  const selfRecStats: Record<string, number> = {};
+
+  summaryLines.push('### Self-Recommendation Language by Config');
+  summaryLines.push('');
+  summaryLines.push('| Config | Games | Total Self-Recs | Mean per Game |');
+  summaryLines.push('|--------|-------|----------------|--------------|');
+  for (const [configName, configGames] of Object.entries(byConfig)) {
+    let totalRecs = 0;
+    for (const game of configGames) {
+      for (const d of game.discussions) {
+        const matches = d.content.match(selfRecRegex);
+        if (matches) totalRecs += matches.length;
+      }
+    }
+    const meanPerGame = configGames.length > 0 ? totalRecs / configGames.length : 0;
+    summaryLines.push(`| ${configName} | ${configGames.length} | ${totalRecs} | ${meanPerGame.toFixed(1)} |`);
+    selfRecStats[configName] = parseFloat(meanPerGame.toFixed(1));
+  }
+  summaryLines.push('');
+
   // Write reports
   const summaryPath = path.join(resultsDir, 'summary.md');
   fs.writeFileSync(summaryPath, summaryLines.join('\n'));
@@ -236,6 +330,11 @@ function main() {
       avgQuestsCompleted: configGames.reduce((s, g) => s + g.quests.length, 0) / n,
     };
   }
+  statsObj['extendedMetrics'] = {
+    verbosity: verbosityStats,
+    sabotageByRound: sabotageRoundStats,
+    selfRecommendations: selfRecStats,
+  };
   fs.writeFileSync(statsPath, JSON.stringify(statsObj, null, 2));
   console.log(`Stats written to ${statsPath}`);
 }

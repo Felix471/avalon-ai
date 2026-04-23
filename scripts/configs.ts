@@ -49,6 +49,31 @@ export const CONFIGS: Record<string, BatchConfig> = {
     models: HETEROGENEOUS_MODELS,
     promptMode: 'naive',
   },
+  'homogeneous-gemini': {
+    name: 'homogeneous-gemini',
+    models: Array(5).fill(model('gemini-flash')),
+    promptMode: 'full',
+  },
+  'homogeneous-deepseek': {
+    name: 'homogeneous-deepseek',
+    models: Array(5).fill(model('deepseek')),
+    promptMode: 'full',
+  },
+  'homogeneous-grok': {
+    name: 'homogeneous-grok',
+    models: Array(5).fill(model('grok')),
+    promptMode: 'full',
+  },
+  'homogeneous-gpt-naive': {
+    name: 'homogeneous-gpt-naive',
+    models: Array(5).fill(model('gpt')),
+    promptMode: 'naive',
+  },
+  'homogeneous-claude-naive': {
+    name: 'homogeneous-claude-naive',
+    models: Array(5).fill(model('claude-sonnet')),
+    promptMode: 'naive',
+  },
 };
 
 export const ALL_CONFIG_NAMES = Object.keys(CONFIGS);

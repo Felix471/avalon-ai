@@ -1,10 +1,116 @@
 {
   "heterogeneous-full": {
-    "n": 2,
-    "goodWinRate": 0.5,
-    "evilWinRate": 0.5,
-    "avgDurationSec": 878.3805,
-    "avgLlmCalls": 134,
-    "avgQuestsCompleted": 3.5
+    "n": 20,
+    "goodWinRate": 0.05,
+    "evilWinRate": 0.95,
+    "avgDurationSec": 722.11505,
+    "avgLlmCalls": 208.4,
+    "avgQuestsCompleted": 4.45
+  },
+  "homogeneous-gpt4o": {
+    "n": 15,
+    "goodWinRate": 0.5333333333333333,
+    "evilWinRate": 0.4666666666666667,
+    "avgDurationSec": 220.42933333333335,
+    "avgLlmCalls": 223.93333333333334,
+    "avgQuestsCompleted": 4.533333333333333
+  },
+  "homogeneous-claude": {
+    "n": 15,
+    "goodWinRate": 0.26666666666666666,
+    "evilWinRate": 0.7333333333333333,
+    "avgDurationSec": 543.3716666666667,
+    "avgLlmCalls": 139.33333333333334,
+    "avgQuestsCompleted": 4.733333333333333
+  },
+  "heterogeneous-naive": {
+    "n": 15,
+    "goodWinRate": 0.2,
+    "evilWinRate": 0.8,
+    "avgDurationSec": 690.8389333333333,
+    "avgLlmCalls": 202.06666666666666,
+    "avgQuestsCompleted": 3.8
+  },
+  "homogeneous-deepseek": {
+    "n": 15,
+    "goodWinRate": 0.5333333333333333,
+    "evilWinRate": 0.4666666666666667,
+    "avgDurationSec": 524.5631999999999,
+    "avgLlmCalls": 186,
+    "avgQuestsCompleted": 3.2
+  },
+  "homogeneous-grok": {
+    "n": 15,
+    "goodWinRate": 0.13333333333333333,
+    "evilWinRate": 0.8666666666666667,
+    "avgDurationSec": 206.9040666666667,
+    "avgLlmCalls": 194.93333333333334,
+    "avgQuestsCompleted": 3.466666666666667
+  },
+  "homogeneous-gemini": {
+    "n": 15,
+    "goodWinRate": 0.13333333333333333,
+    "evilWinRate": 0.8666666666666667,
+    "avgDurationSec": 1938.9748,
+    "avgLlmCalls": 222.6,
+    "avgQuestsCompleted": 4.6
+  },
+  "homogeneous-gpt-naive": {
+    "n": 15,
+    "goodWinRate": 0.06666666666666667,
+    "evilWinRate": 0.9333333333333333,
+    "avgDurationSec": 211.8970666666667,
+    "avgLlmCalls": 186.33333333333334,
+    "avgQuestsCompleted": 3.6666666666666665
+  },
+  "homogeneous-claude-naive": {
+    "n": 15,
+    "goodWinRate": 0.26666666666666666,
+    "evilWinRate": 0.7333333333333333,
+    "avgDurationSec": 680.3312,
+    "avgLlmCalls": 153,
+    "avgQuestsCompleted": 3.6666666666666665
+  },
+  "extendedMetrics": {
+    "verbosity": {
+      "claude-sonnet-4-6": {
+        "goodAvg": 193.1,
+        "evilAvg": 186.3
+      },
+      "deepseek-chat": {
+        "goodAvg": 186.7,
+        "evilAvg": 182.8
+      },
+      "gemini-2.5-flash": {
+        "goodAvg": 171.9,
+        "evilAvg": 179.5
+      },
+      "gpt-5.4-mini": {
+        "goodAvg": 109,
+        "evilAvg": 108
+      },
+      "grok-4-fast-non-reasoning": {
+        "goodAvg": 247.7,
+        "evilAvg": 234.2
+      }
+    },
+    "sabotageByRound": {
+      "1": 0.5402,
+      "2": 0.7184,
+      "3": 0.7719,
+      "4": 0.8261,
+      "5": 0.8667
+    },
+    "selfRecommendations": {
+      "heterogeneous-full": 5.2,
+      "homogeneous-gpt4o": 0.1,
+      "homogeneous-claude": 7.2,
+      "heterogeneous-naive": 6.7,
+      "homogeneous-deepseek": 2.3,
+      "homogeneous-grok": 5.7,
+      "homogeneous-gemini": 2.4,
+      "homogeneous-gpt-naive": 0.6,
+      "homogeneous-claude-naive": 8.7
+    }
   }
 }

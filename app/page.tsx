@@ -1,138 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore, useHydration } from '@/lib/game/store';
 import { AI_MODELS } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import {
-  Users, Play, Bot, Info, Heart, Lock, Sparkles, AlertCircle, Trash2, ArrowRight
+  Users, Play, Bot, Info, Heart, AlertCircle, Trash2, ArrowRight
 } from 'lucide-react';
-
-// ==================== 验证组件 ====================
-
-function AuthGate({ onVerified }: { onVerified: () => void }) {
-  const [chineseName, setChineseName] = useState('');
-  const [englishName, setEnglishName] = useState('');
-  const [error, setError] = useState('');
-  const [shake, setShake] = useState(false);
-
-  const handleSubmit = () => {
-    // 硬编码验证
-    const isCorrect =
-      chineseName.trim() === '王梓宜' &&
-      englishName.trim().toLowerCase() === 'felix';
-
-    if (isCorrect) {
-      // [追踪代码] 记录成功验证的访问
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'auth_success' }),
-      }).catch((err) => console.error('Tracking failed:', err)); // 静默失败，不影响用户体验
-
-      sessionStorage.setItem('avalon_verified', 'true');
-      onVerified();
-    } else {
-      setError('答案不正确，请联系作者获取正确答案 😅');
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div
-        className={`
-          bg-slate-800/80 rounded-2xl border border-slate-700 p-8 max-w-md w-full
-          shadow-2xl backdrop-blur-sm
-          ${shake ? 'animate-shake' : ''}
-        `}
-      >
-        {/* 标题 */}
-        <div className="flex flex-col items-center justify-center mb-8 gap-3">
-          <img
-             src="/logo.jpg"
-             alt="Logo"
-             className="w-16 h-16 rounded-xl object-cover shadow-lg"
-          />
-          <h1 className="text-2xl font-bold text-amber-400">AI 阿瓦隆</h1>
-          <p className="text-slate-400 text-sm">请回答以下问题以验证身份</p>
-        </div>
-
-        {/* 验证表单 */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-slate-300 text-sm mb-2">
-              <Lock className="w-4 h-4 inline mr-1" />
-              作者的中文名是？
-            </label>
-            <Input
-              value={chineseName}
-              onChange={(e) => setChineseName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="请输入中文名"
-              className="bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 text-sm mb-2">
-              <Lock className="w-4 h-4 inline mr-1" />
-              作者的英文名是？
-            </label>
-            <Input
-              value={englishName}
-              onChange={(e) => setEnglishName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="请输入英文名"
-              className="bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-
-          {error && (
-            <div className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded">
-              {error}
-            </div>
-          )}
-
-          <Button
-            onClick={handleSubmit}
-            className="w-full bg-amber-600 hover:bg-amber-500"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            验证身份
-          </Button>
-        </div>
-
-        {/* 底部提示 */}
-        <div className="mt-6 text-center text-slate-500 text-xs">
-          如果你不知道答案，说明你可能不是目标用户 🤔
-        </div>
-      </div>
-
-      {/* shake 动画 */}
-      <style jsx global>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
-    </div>
-  );
-}
 
 // ==================== 大厅主组件 ====================
 
@@ -165,13 +40,6 @@ function LobbyContent() {
       alert('请至少选择 2 个 AI 模型');
       return;
     }
-
-    // [追踪代码] 记录游戏开始事件
-    fetch('/api/track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'game_start' }),
-    }).catch((err) => console.error('Tracking failed:', err));
 
     startGame();
     router.push('/game');
@@ -434,24 +302,12 @@ function LobbyContent() {
   );
 }
 
-// ==================== 主页面（包含验证逻辑） ====================
+// ==================== 主页面 ====================
 
 export default function HomePage() {
   const hydrated = useHydration();
-  const [isVerified, setIsVerified] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
 
-  useEffect(() => {
-    // 检查是否已验证
-    if (typeof window !== 'undefined') {
-      const verified = sessionStorage.getItem('avalon_verified') === 'true';
-      setIsVerified(verified);
-      setIsChecking(false);
-    }
-  }, []);
-
-  // 等待 hydration 和验证检查
-  if (!hydrated || isChecking) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
         <div className="text-white text-xl">正在加载...</div>
@@ -459,11 +315,5 @@ export default function HomePage() {
     );
   }
 
-  // 未验证：显示验证页面
-  if (!isVerified) {
-    return <AuthGate onVerified={() => setIsVerified(true)} />;
-  }
-
-  // 已验证：显示大厅
   return <LobbyContent />;
 }

@@ -8,6 +8,12 @@
  * initial delay 2 seconds).
  */
 
+// ==================== Reasoning Model Detection ====================
+
+const REASONING_MODEL_PREFIXES = ['gpt-5', 'o1', 'o3', 'o4'];
+const isReasoningModel = (model: string) =>
+  REASONING_MODEL_PREFIXES.some(prefix => model.toLowerCase().startsWith(prefix));
+
 // ==================== Provider Call Functions ====================
 
 async function callAnthropic(model: string, prompt: string): Promise<string> {
@@ -54,7 +60,7 @@ async function callOpenAI(model: string, prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      ...(isReasoningModel(model) ? { max_completion_tokens: 300 } : { max_tokens: 300 }),
       messages: [{ role: 'user', content: prompt }],
     }),
   });
