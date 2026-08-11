@@ -18,7 +18,7 @@ Headless batch execution pipeline for AI-only Avalon games.
 ## Running Games
 
 ```bash
-# Run 10 games per config (40 total across all 4 configs)
+# Run 10 games per config (90 total across all 9 configs)
 npm run batch -- --games=10 --configs=all
 
 # Run 1 game for a specific config (smoke test)
@@ -30,12 +30,21 @@ npm run batch -- --games=5 --configs=heterogeneous-full,homogeneous-gpt4o
 
 ### Available configs
 
-| Config | Models | Prompt mode |
-|--------|--------|-------------|
-| `heterogeneous-full` | Claude, GPT-4o, Gemini Pro, DeepSeek, Grok | Full strategy prompts |
-| `homogeneous-gpt4o` | 5× GPT-4o | Full strategy prompts |
-| `homogeneous-claude` | 5× Claude Sonnet | Full strategy prompts |
-| `heterogeneous-naive` | Claude, GPT-4o, Gemini Pro, DeepSeek, Grok | Naive baseline (no strategy) |
+Exact model API strings (see `analysis/config_map.md` for paper labels and collection dates).
+Note: `homogeneous-gpt4o` is a historical label — it runs **gpt-5.4-mini**, not GPT-4o (model
+identifiers were updated in commit `ef8305b` without renaming config ids).
+
+| Config | Models (exact API strings) | Prompt mode |
+|--------|---------------------------|-------------|
+| `heterogeneous-full` | claude-sonnet-4-6, gpt-5.4-mini, gemini-2.5-flash, deepseek-chat, grok-4-fast-non-reasoning | Full strategy prompts |
+| `homogeneous-gpt4o` | 5× gpt-5.4-mini | Full strategy prompts |
+| `homogeneous-claude` | 5× claude-sonnet-4-6 | Full strategy prompts |
+| `heterogeneous-naive` | claude-sonnet-4-6, gpt-5.4-mini, gemini-2.5-flash, deepseek-chat, grok-4-fast-non-reasoning | Naive baseline (no strategy) |
+| `homogeneous-deepseek` | 5× deepseek-chat | Full strategy prompts |
+| `homogeneous-grok` | 5× grok-4-fast-non-reasoning | Full strategy prompts |
+| `homogeneous-gemini` | 5× gemini-2.5-flash | Full strategy prompts |
+| `homogeneous-gpt-naive` | 5× gpt-5.4-mini | Naive baseline (no strategy) |
+| `homogeneous-claude-naive` | 5× claude-sonnet-4-6 | Naive baseline (no strategy) |
 
 ### Output files
 
