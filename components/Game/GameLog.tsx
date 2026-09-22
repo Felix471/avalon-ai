@@ -2,6 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/game/store';
+import { Flag, Info, MessageCircle, ScrollText, Skull, Swords, Users, Vote } from 'lucide-react';
+import { panelClass, panelHeadingClass, subtleTextClass } from './ui';
+
+const eventIcons: Record<string, typeof Info> = {
+  discussion: MessageCircle,
+  vote: Vote,
+  quest_action: Swords,
+  quest_result: Flag,
+  assassination: Skull,
+  team_proposal: Users,
+  system: Info,
+};
 
 export default function GameLog() {
   const { gameState } = useGameStore();
@@ -16,43 +28,36 @@ export default function GameLog() {
 
   if (!gameState) return null;
 
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case 'discussion': return '💬';
-      case 'vote': return '🗳️';
-      case 'quest_action': return '⚔️';
-      case 'quest_result': return '📊';
-      case 'assassination': return '🗡️';
-      case 'team_proposal': return '👥';
-      case 'system': return '📢';
-      default: return '•';
-    }
-  };
-
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-      <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-        📜 游戏记录
+    <div className={panelClass}>
+      <h3 className={`${panelHeadingClass} mb-3`}>
+        <ScrollText aria-hidden="true" className="size-5" />
+        游戏记录
       </h3>
 
       <div
         ref={scrollRef}
-        className="h-48 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-slate-600"
+        className="max-h-[40vh] min-h-32 space-y-2 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-600"
       >
         {gameState.events.length === 0 ? (
-          <div className="text-slate-500 text-sm text-center py-4">
+          <div className={`${subtleTextClass} py-4 text-center text-slate-500`}>
             游戏事件将显示在这里...
           </div>
         ) : (
-          gameState.events.map((event) => (
-            <div key={event.id} className="text-sm">
-              <span className="mr-1">{getEventIcon(event.type)}</span>
-              {event.playerName && (
-                <span className="text-amber-400 font-medium">{event.playerName}: </span>
-              )}
-              <span className="text-slate-300">{event.content}</span>
-            </div>
-          ))
+          gameState.events.map((event) => {
+            const EventIcon = eventIcons[event.type] || Info;
+            return (
+              <div key={event.id} className="flex items-start gap-1.5 text-sm">
+                <EventIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                <span>
+                  {event.playerName && (
+                    <span className="font-medium text-amber-400">{event.playerName}: </span>
+                  )}
+                  <span className="text-slate-300">{event.content}</span>
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

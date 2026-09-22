@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { getPlayerVision } from '@/lib/game/engine';
 import { ROLES } from '@/lib/game/types';
-import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { RoleIcon } from './roleIcon';
+import { panelClass } from './ui';
 
 export default function VisionPanel() {
   const { gameState } = useGameStore();
@@ -31,7 +34,7 @@ export default function VisionPanel() {
       return {
         label: '已知邪恶',
         players: vision.knownEvil,
-        color: 'red',
+        color: 'rose',
         hint: '莫德雷德对你隐身',
       };
     }
@@ -39,7 +42,7 @@ export default function VisionPanel() {
       return {
         label: '梅林/莫甘娜',
         players: vision.knownMerlinOrMorgana,
-        color: 'cyan',
+        color: 'sky',
         hint: '需要分辨真假',
       };
     }
@@ -47,7 +50,7 @@ export default function VisionPanel() {
       return {
         label: '邪恶同伴',
         players: vision.teammates,
-        color: 'red',
+        color: 'rose',
         hint: '奥伯伦隐身',
       };
     }
@@ -58,23 +61,27 @@ export default function VisionPanel() {
   if (!visionInfo) return null;
 
   const colorClasses = {
-    red: 'border-red-500/50 bg-red-900/30 text-red-300',
-    cyan: 'border-cyan-500/50 bg-cyan-900/30 text-cyan-300',
+    rose: 'border-rose-500/50 bg-rose-900/30 text-rose-300',
+    sky: 'border-sky-500/50 bg-sky-900/30 text-sky-300',
   };
 
   return (
-    <div className={`rounded-lg border overflow-hidden ${colorClasses[visionInfo.color as 'red' | 'cyan']}`}>
+    <div className={cn(panelClass, 'overflow-hidden p-0', colorClasses[visionInfo.color as 'rose' | 'sky'])}>
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="w-full px-3 py-2 flex items-center justify-between hover:bg-black/20 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span>{role.emoji}</span>
+          <RoleIcon role={role.type} className="size-4" />
           <span className="text-sm font-medium">{role.name}的视野</span>
         </div>
         <div className="flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5" />
-          {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          <Eye aria-hidden="true" className="size-4" />
+          {isCollapsed ? (
+            <ChevronDown aria-hidden="true" className="size-4" />
+          ) : (
+            <ChevronUp aria-hidden="true" className="size-4" />
+          )}
         </div>
       </button>
 
@@ -96,7 +103,10 @@ export default function VisionPanel() {
                 );
               })}
             </div>
-            <p className="text-xs opacity-60 italic">⚠️ {visionInfo.hint}</p>
+            <p className="flex items-center gap-1 text-xs italic opacity-60">
+              <AlertTriangle aria-hidden="true" className="size-4" />
+              {visionInfo.hint}
+            </p>
           </div>
         </div>
       )}

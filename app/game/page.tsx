@@ -17,6 +17,8 @@ import HistoryPanel from '@/components/Game/HistoryPanel';
 import AssassinFloatingButton from '@/components/Game/AssassinFloatingButton';
 import VisionPanel from '@/components/Game/VisionPanel';
 import { ExitGameButton } from '@/components/Game/ExitGameButton';
+import { panelClass, panelHeadingClass, subtleTextClass } from '@/components/Game/ui';
+import { Swords } from 'lucide-react';
 
 export default function GamePage() {
   const router = useRouter();
@@ -73,7 +75,7 @@ export default function GamePage() {
     <main className="min-h-screen bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="max-w-[1600px] mx-auto">
         {/* 顶部状态栏 */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           {/* Logo 和 标题 */}
           <div className="flex items-center gap-3">
             <img
@@ -84,12 +86,14 @@ export default function GamePage() {
             <h1 className="text-2xl font-bold text-amber-400">AI 阿瓦隆</h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex basis-full flex-wrap items-center justify-end gap-2 sm:basis-auto sm:gap-4">
             {/* 当前轮次和投票次数 */}
-            <div className="text-sm text-slate-300 bg-slate-800/50 px-3 py-1 rounded-lg">
+            <div className="rounded-lg bg-slate-800/50 px-3 py-1 text-sm text-slate-300 tabular-nums">
               任务 {gameState.currentQuest}/5 · 投票 {gameState.consecutiveRejects + 1}/5
             </div>
-            <QuestTracker />
+            <div className="order-last flex basis-full justify-end sm:order-none sm:basis-auto">
+              <QuestTracker />
+            </div>
             <ExitGameButton />
           </div>
         </div>
@@ -107,9 +111,12 @@ export default function GamePage() {
 
             {/* 任务执行结果（只在quest阶段后显示） */}
             {gameState.phase === 'quest' && (
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-                <h3 className="text-amber-400 font-bold mb-2">⚔️ 任务执行中</h3>
-                <p className="text-slate-400 text-sm">
+              <div className={panelClass}>
+                <h3 className={`${panelHeadingClass} mb-2 text-amber-400`}>
+                  <Swords aria-hidden="true" className="size-5" />
+                  任务执行中
+                </h3>
+                <p className={subtleTextClass}>
                   队伍正在执行任务，等待所有队员完成行动...
                 </p>
               </div>
@@ -122,9 +129,9 @@ export default function GamePage() {
           </div>
 
           {/* ========== 右侧：玩家交互面板 ========== */}
-          <div data-testid="phase-panel" className="lg:col-span-4 space-y-4 order-3">
+          <div data-testid="phase-panel" className="order-3 flex flex-col gap-4 lg:col-span-4">
             {/* 当前阶段操作面板 */}
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 min-h-[280px]">
+            <div className={`${panelClass} min-h-[280px]`}>
               {renderPhasePanel()}
             </div>
 

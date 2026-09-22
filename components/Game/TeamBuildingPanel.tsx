@@ -5,9 +5,10 @@ import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { getCurrentLeader, isForcedTeamBuilding } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Bot, Crown, Loader2, Target, User } from 'lucide-react';
 import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
+import { panelClass, panelHeadingClass } from './ui';
 
 export default function TeamBuildingPanel() {
   const {
@@ -124,11 +125,17 @@ export default function TeamBuildingPanel() {
   if (!isHumanLeader && !humanOverride) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-white">🎯 组建队伍</h2>
+        <h2 className={`${panelHeadingClass} text-xl`}>
+          <Target aria-hidden="true" className="size-5" />
+          组建队伍
+        </h2>
 
         {isForced && (
           <div className="p-3 bg-red-900/30 border border-red-500 rounded-lg">
-            <p className="text-red-300 font-bold">⚠️ 强制发车！</p>
+            <p className="flex items-center gap-1 font-bold text-rose-300">
+              <AlertTriangle aria-hidden="true" className="size-4" />
+              强制发车！
+            </p>
             <p className="text-slate-400 text-sm">第5次组队，队长直接指定队伍执行任务</p>
           </div>
         )}
@@ -145,9 +152,9 @@ export default function TeamBuildingPanel() {
             />
           </div>
         ) : (
-          <div className="p-4 bg-slate-700/50 rounded-lg">
+          <div className={panelClass}>
             <div className="flex items-center gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+              <Loader2 aria-hidden="true" className="size-5 animate-spin text-amber-400" />
               <div>
                 <p className="text-white font-medium">玩家{leader.id} 正在选择队伍...</p>
                 <p className="text-slate-400 text-sm">{leader.aiModel?.name || 'AI'}</p>
@@ -167,22 +174,29 @@ export default function TeamBuildingPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">🎯 组建队伍</h2>
-        <div className="text-xs text-slate-400 bg-slate-700/50 px-2 py-1 rounded">
+        <h2 className={`${panelHeadingClass} text-xl`}>
+          <Target aria-hidden="true" className="size-5" />
+          组建队伍
+        </h2>
+        <div className="rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-400 tabular-nums">
           第{consecutiveRejects + 1}次组队
         </div>
       </div>
 
       {isForced && (
         <div className="p-3 bg-red-900/30 border border-red-500 rounded-lg">
-          <p className="text-red-300 font-bold">⚠️ 强制发车！</p>
+          <p className="flex items-center gap-1 font-bold text-rose-300">
+            <AlertTriangle aria-hidden="true" className="size-4" />
+            强制发车！
+          </p>
           <p className="text-slate-400 text-sm">第5次组队，你可以直接指定队伍执行任务，无需投票</p>
         </div>
       )}
 
       <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg">
-        <p className="text-amber-300">
-          👑 你是本轮队长！选择 <span className="font-bold">{requiredSize}</span> 名队员
+        <p className="flex items-center gap-1 text-amber-300">
+          <Crown aria-hidden="true" className="size-4" />
+          <span>你是本轮队长！选择 <span className="font-bold tabular-nums">{requiredSize}</span> 名队员</span>
         </p>
       </div>
 
@@ -213,8 +227,13 @@ export default function TeamBuildingPanel() {
                 disabled={isDisabled}
                 className="border-slate-500"
               />
-              <span className={`font-medium ${isHuman ? 'text-amber-300' : 'text-white'}`}>
-                {isHuman ? '👤' : '🤖'} 玩家{player.id}
+              <span className={`flex items-center gap-1 font-medium ${isHuman ? 'text-amber-300' : 'text-white'}`}>
+                {isHuman ? (
+                  <User aria-hidden="true" className="size-4" />
+                ) : (
+                  <Bot aria-hidden="true" className="size-4" />
+                )}
+                玩家{player.id}
               </span>
             </label>
           );
@@ -222,7 +241,7 @@ export default function TeamBuildingPanel() {
       </div>
 
       {/* 已选计数 */}
-      <div className="text-center text-slate-400 text-sm">
+      <div className="text-center text-sm text-slate-400 tabular-nums">
         已选择 {selectedPlayers.length} / {requiredSize}
       </div>
 

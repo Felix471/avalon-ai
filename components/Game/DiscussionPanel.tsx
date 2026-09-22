@@ -6,7 +6,18 @@ import { getCurrentLeader } from '@/lib/game/engine';
 import { DISCUSSION_ROUNDS } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle, Send, Info, MessageCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bot,
+  Check,
+  Crown,
+  Info,
+  Loader2,
+  MessageCircle,
+  Mic,
+  Send,
+  User,
+} from 'lucide-react';
 import {
   validateSpeechInput,
   quickSuspicionCheck,
@@ -14,6 +25,7 @@ import {
 } from '@/lib/security/inputValidator';
 import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
+import { panelClass, panelHeadingClass } from './ui';
 
 // ==================== 安全输入组件（内联） ====================
 
@@ -39,7 +51,7 @@ function SecureSpeechInput({
 
     // 快速可疑检查（不阻塞输入，只是警告）
     if (quickSuspicionCheck(value)) {
-      setWarning('⚠️ 检测到可疑内容，可能无法发送');
+      setWarning('检测到可疑内容，可能无法发送');
     } else if (value.length > MAX_SPEECH_LENGTH * 0.8) {
       setWarning(`接近字数限制 (${value.length}/${MAX_SPEECH_LENGTH})`);
     } else {
@@ -104,7 +116,7 @@ function SecureSpeechInput({
       {/* 警告信息 */}
       {warning && !error && (
         <div className="flex items-center gap-2 text-yellow-400 text-sm">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
           <span>{warning}</span>
         </div>
       )}
@@ -112,7 +124,7 @@ function SecureSpeechInput({
       {/* 错误信息 */}
       {error && (
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 px-3 py-2 rounded">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -120,7 +132,7 @@ function SecureSpeechInput({
       {/* 提交按钮和提示 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 text-slate-500 text-xs">
-          <Info className="w-3 h-3" />
+          <Info aria-hidden="true" className="size-4" />
           <span>按 Enter 发送，Shift+Enter 换行</span>
         </div>
 
@@ -130,7 +142,7 @@ function SecureSpeechInput({
           size="sm"
           className="gap-2"
         >
-          <Send className="w-4 h-4" />
+          <Send aria-hidden="true" className="size-4" />
           发言
         </Button>
       </div>
@@ -306,28 +318,31 @@ export default function DiscussionPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* 标题 */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <MessageCircle className="w-5 h-5" />
+        <h2 className={`${panelHeadingClass} text-xl`}>
+          <MessageCircle aria-hidden="true" className="size-5" />
           发言讨论
         </h2>
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-slate-400 tabular-nums">
           任务 {currentQuest} · 第 {consecutiveRejects + 1} 次组队
         </div>
       </div>
 
       {/* 当前队长提示 */}
       <div className="p-3 bg-amber-900/30 rounded-lg border border-amber-700">
-        <span className="text-amber-400">👑 队长：</span>
+        <span className="inline-flex items-center gap-1 text-amber-400">
+          <Crown aria-hidden="true" className="size-4" />
+          队长：
+        </span>
         <span className="text-white ml-2">
           玩家{leader.id} {leader.id === humanPlayerId ? '(你)' : `(${leader.aiModel?.name || 'AI'})`}
         </span>
       </div>
 
       {/* 发言记录 */}
-      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+      <div className="min-h-0 max-h-[45vh] flex-1 space-y-3 overflow-y-auto">
         {Array.from({ length: Math.min(currentSpeakerIndex, totalSpeakingSteps) }, (_, index) => {
           const player = speakingOrder[index % players.length];
           const speech = speeches.find(entry => entry.step === index)?.content;
@@ -349,8 +364,13 @@ export default function DiscussionPanel() {
                 `}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium">
-                    {isHuman ? '👤' : '🤖'} 玩家{player.id}
+                  <span className="flex items-center gap-1 text-sm font-medium">
+                    {isHuman ? (
+                      <User aria-hidden="true" className="size-4" />
+                    ) : (
+                      <Bot aria-hidden="true" className="size-4" />
+                    )}
+                    玩家{player.id}
                   </span>
                   {!isHuman && (
                     <span className="text-xs text-slate-500">
@@ -367,11 +387,12 @@ export default function DiscussionPanel() {
 
       {/* 当前发言者指示 / 输入框 */}
       {!allSpoken && (
-        <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+        <div className={panelClass}>
           {isHumanTurn ? (
             <div className="space-y-3">
-              <div className="text-amber-400 font-medium">
-                🎤 轮到你发言了！
+              <div className="flex items-center gap-2 font-medium text-amber-400">
+                <Mic aria-hidden="true" className="size-4" />
+                轮到你发言了！
               </div>
 
               <SecureSpeechInput
@@ -402,7 +423,7 @@ export default function DiscussionPanel() {
             </div>
           ) : (
             <div className="flex items-center gap-3 text-slate-400">
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 aria-hidden="true" className="size-5 animate-spin" />
               <span>
                 玩家{currentSpeaker?.id} ({currentSpeaker?.aiModel?.name || 'AI'}) 正在发言...
               </span>
@@ -440,15 +461,19 @@ export default function DiscussionPanel() {
 
       {/* 否决次数提示 */}
       {consecutiveRejects > 0 && (
-        <div className="text-center text-yellow-400 text-sm">
-          ⚠️ 连续否决: {consecutiveRejects}/5
+        <div className="flex items-center justify-center gap-1 text-center text-sm text-yellow-400 tabular-nums">
+          <AlertTriangle aria-hidden="true" className="size-4" />
+          连续否决: {consecutiveRejects}/5
         </div>
       )}
 
       {/* 发言结束，进入组队 */}
       {allSpoken && (
         <div className="text-center space-y-3">
-          <p className="text-green-400">✓ 所有玩家发言完毕</p>
+          <p className="flex items-center justify-center gap-1 text-green-400">
+            <Check aria-hidden="true" className="size-4" />
+            所有玩家发言完毕
+          </p>
           <Button data-testid="discussion-end" onClick={handleEndDiscussion} className="w-full">
             进入组队阶段 →
           </Button>

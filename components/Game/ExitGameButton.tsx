@@ -35,7 +35,7 @@ export function ExitGameButton() {
         onClick={handleExit}
         className="text-slate-400 hover:text-white hover:bg-slate-700"
       >
-        <LogOut className="w-4 h-4 mr-1" />
+        <LogOut aria-hidden="true" className="mr-1 size-4" />
         退出
       </Button>
 

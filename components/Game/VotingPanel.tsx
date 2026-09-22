@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { Button } from '@/components/ui/button';
-import { Loader2, ThumbsUp, ThumbsDown, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, Bot, Check, Eye, EyeOff, Loader2, ThumbsDown, ThumbsUp, User, Vote, X } from 'lucide-react';
 import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
+import { chipClass, panelHeadingClass } from './ui';
 
 export default function VotingPanel() {
   const {
@@ -149,8 +150,11 @@ export default function VotingPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">🗳️ 队伍投票</h2>
-        <div className="text-xs text-slate-400 bg-slate-700/50 px-2 py-1 rounded">
+        <h2 className={`${panelHeadingClass} text-xl`}>
+          <Vote aria-hidden="true" className="size-5" />
+          队伍投票
+        </h2>
+        <div className="rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-400 tabular-nums">
           任务{currentQuest} · 第{consecutiveRejects + 1}次投票
         </div>
       </div>
@@ -165,22 +169,28 @@ export default function VotingPanel() {
               <span
                 key={player.id}
                 className={`
-                  px-2 py-1 rounded-full text-sm font-medium
+                  ${chipClass} py-1 text-sm font-medium
                   ${isHuman 
                     ? 'bg-amber-500/30 text-amber-300 border border-amber-500' 
                     : 'bg-slate-600 text-white'
                   }
                 `}
               >
-                {isHuman ? '👤' : '🤖'} 玩家{player.id}
+                {isHuman ? (
+                  <User aria-hidden="true" className="size-4" />
+                ) : (
+                  <Bot aria-hidden="true" className="size-4" />
+                )}
+                玩家{player.id}
               </span>
             );
           })}
         </div>
 
         {humanIsOnTeam && (
-          <p className="text-amber-400 text-xs mt-2">
-            ⚠️ 你在这个队伍中，但你仍然可以自由投票
+          <p className="mt-2 flex items-center gap-1 text-xs text-amber-400">
+            <AlertTriangle aria-hidden="true" className="size-4" />
+            你在这个队伍中，但你仍然可以自由投票
           </p>
         )}
       </div>
@@ -197,7 +207,7 @@ export default function VotingPanel() {
               onClick={() => handleVote(true)}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              <ThumbsUp className="w-4 h-4 mr-2" />
+              <ThumbsUp aria-hidden="true" className="mr-2 size-4" />
               同意
             </Button>
             <Button
@@ -205,14 +215,17 @@ export default function VotingPanel() {
               onClick={() => handleVote(false)}
               className="flex-1 bg-red-600 hover:bg-red-700"
             >
-              <ThumbsDown className="w-4 h-4 mr-2" />
+              <ThumbsDown aria-hidden="true" className="mr-2 size-4" />
               反对
             </Button>
           </div>
         </div>
       ) : !votesRevealed ? (
         <div className="text-center py-2 space-y-2">
-          <p className="text-green-400">✓ 你已投票</p>
+          <p className="flex items-center justify-center gap-1 text-green-400">
+            <Check aria-hidden="true" className="size-4" />
+            你已投票
+          </p>
           <p className="text-slate-400 text-sm">等待其他玩家投票...</p>
         </div>
       ) : null}
@@ -221,7 +234,7 @@ export default function VotingPanel() {
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-slate-400">投票进度</span>
-          <span className="text-slate-300">{total} / {players.length}</span>
+          <span className="text-slate-300 tabular-nums">{total} / {players.length}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -245,21 +258,25 @@ export default function VotingPanel() {
                   }
                 `}
               >
-                <span>{isHuman ? '👤' : '🤖'}</span>
+                {isHuman ? (
+                  <User aria-hidden="true" className="size-4" />
+                ) : (
+                  <Bot aria-hidden="true" className="size-4" />
+                )}
                 <span className={`truncate ${isHuman ? 'text-amber-300' : 'text-white'}`}>
                   玩家{player.id}
                 </span>
 
                 {votesRevealed ? (
                   revealedVote ? (
-                    <ThumbsUp className="w-3 h-3 text-green-400 ml-auto" />
+                    <ThumbsUp aria-hidden="true" className="ml-auto size-4 text-green-400" />
                   ) : (
-                    <ThumbsDown className="w-3 h-3 text-red-400 ml-auto" />
+                    <ThumbsDown aria-hidden="true" className="ml-auto size-4 text-rose-400" />
                   )
                 ) : hasPendingVote ? (
-                  <EyeOff className="w-3 h-3 text-slate-400 ml-auto" />
+                  <EyeOff aria-hidden="true" className="ml-auto size-4 text-slate-400" />
                 ) : (
-                  <Loader2 className="w-3 h-3 animate-spin text-slate-500 ml-auto" />
+                  <Loader2 aria-hidden="true" className="ml-auto size-4 animate-spin text-slate-500" />
                 )}
               </div>
             );
@@ -286,7 +303,7 @@ export default function VotingPanel() {
       {/* 亮票动画 */}
       {isRevealing && !votesRevealed && (
         <div className="text-center py-4 animate-pulse">
-          <Eye className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+          <Eye aria-hidden="true" className="mx-auto mb-2 size-5 text-amber-400" />
           <p className="text-amber-400 font-bold">亮票中...</p>
         </div>
       )}
@@ -294,14 +311,22 @@ export default function VotingPanel() {
       {/* 投票结果 */}
       {votesRevealed && (
         <div className="p-4 bg-slate-700/30 rounded-lg text-center">
-          <div className="flex justify-center gap-8 text-lg font-bold mb-2">
-            <span className="text-green-400">👍 {approveCount}</span>
-            <span className="text-red-400">👎 {rejectCount}</span>
+          <div className="mb-2 flex justify-center gap-8 text-lg font-bold tabular-nums">
+            <span className="flex items-center gap-1 text-green-400">
+              <ThumbsUp aria-hidden="true" className="size-4" />
+              {approveCount}
+            </span>
+            <span className="flex items-center gap-1 text-rose-400">
+              <ThumbsDown aria-hidden="true" className="size-4" />
+              {rejectCount}
+            </span>
           </div>
-          <p className={`text-sm ${approveCount > rejectCount ? 'text-green-400' : 'text-red-400'}`}>
-            {approveCount > rejectCount
-              ? '✓ 投票通过！准备执行任务'
-              : '✗ 投票否决！换下一位队长'}
+          <p className={`flex items-center justify-center gap-1 text-sm ${approveCount > rejectCount ? 'text-green-400' : 'text-rose-400'}`}>
+            {approveCount > rejectCount ? (
+              <><Check aria-hidden="true" className="size-4" />投票通过！准备执行任务</>
+            ) : (
+              <><X aria-hidden="true" className="size-4" />投票否决！换下一位队长</>
+            )}
           </p>
         </div>
       )}

@@ -5,7 +5,7 @@ import { useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Target, Swords, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Bot, Swords, Target, User } from 'lucide-react';
 
 export default function AssassinFloatingButton() {
   const { gameState, assassinate } = useGameStore();
@@ -64,27 +64,27 @@ export default function AssassinFloatingButton() {
         <Button
           onClick={handleOpenDialog}
           className="
-            bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900
-            text-white shadow-lg shadow-red-900/50
+            bg-gradient-to-r from-rose-600 to-rose-800 hover:from-rose-700 hover:to-rose-900
+            text-white shadow-lg shadow-rose-900/50
             rounded-full w-16 h-16 p-0
             animate-pulse hover:animate-none
             transition-all hover:scale-110
           "
           title="刺杀梅林"
         >
-          <Swords className="w-7 h-7" />
+          <Swords aria-hidden="true" className="size-5" />
         </Button>
-        <div className="absolute -top-1 -right-1 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full">
+        <div className="absolute -right-1 -top-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-black">
           刺客
         </div>
       </div>
 
       {/* 刺杀对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-slate-800 border-red-700 max-w-md">
+        <DialogContent className="max-w-md border-rose-700 bg-slate-800">
           <DialogHeader>
-            <DialogTitle className="text-red-400 flex items-center gap-2">
-              <Swords className="w-5 h-5" />
+            <DialogTitle className="flex items-center gap-2 text-rose-400">
+              <Swords aria-hidden="true" className="size-5" />
               {confirmStep ? '确认刺杀' : '选择刺杀目标'}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -97,7 +97,7 @@ export default function AssassinFloatingButton() {
 
           {/* 警告信息 */}
           <div className="p-3 bg-yellow-900/30 rounded-lg border border-yellow-700 flex items-start gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-yellow-500" />
             <div className="text-sm">
               <div className="text-yellow-400 font-medium">警告</div>
               <div className="text-yellow-200/70">
@@ -118,11 +118,15 @@ export default function AssassinFloatingButton() {
                   onClick={() => handleSelectTarget(player.id)}
                   className={`
                     w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left
-                    bg-slate-700/50 hover:bg-red-900/30 border-2 border-transparent hover:border-red-500
+                    bg-slate-700/50 hover:bg-rose-900/30 border-2 border-transparent hover:border-rose-500
                   `}
                 >
-                  <Target className="w-5 h-5 text-slate-500" />
-                  <span className="text-xl">{player.id === humanPlayerId ? '👤' : '🤖'}</span>
+                  <Target aria-hidden="true" className="size-5 text-slate-500" />
+                  {player.id === humanPlayerId ? (
+                    <User aria-hidden="true" className="size-4" />
+                  ) : (
+                    <Bot aria-hidden="true" className="size-4" />
+                  )}
                   <div className="flex flex-col">
                     <span className="text-white font-medium">
                       玩家{player.id}
@@ -137,9 +141,9 @@ export default function AssassinFloatingButton() {
           ) : (
             /* 确认步骤 */
             <div className="text-center py-4">
-              <div className="text-4xl mb-3">🎯</div>
-              <div className="text-white text-lg">
-                目标：<span className="text-red-400 font-bold">玩家{selectedTarget}</span>
+              <div className="flex items-center justify-center gap-2 text-lg text-white">
+                <Target aria-hidden="true" className="size-5 text-rose-400" />
+                目标：<span className="font-bold text-rose-400">玩家{selectedTarget}</span>
               </div>
               <div className="text-slate-400 text-sm mt-1">
                 {players.find(p => p.id === selectedTarget)?.aiModel?.name || '人类玩家'}
@@ -159,9 +163,9 @@ export default function AssassinFloatingButton() {
             {confirmStep && (
               <Button
                 onClick={handleConfirmAssassinate}
-                className="flex-1 bg-red-600 hover:bg-red-700"
+                className="flex-1 bg-rose-600 hover:bg-rose-700"
               >
-                <Swords className="w-4 h-4 mr-2" />
+                <Swords aria-hidden="true" className="mr-2 size-4" />
                 确认刺杀
               </Button>
             )}

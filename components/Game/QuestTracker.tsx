@@ -26,12 +26,12 @@ export default function QuestTracker() {
         let textColor = 'text-slate-400';
 
         if (quest.result === 'success') {
-          bgColor = 'bg-blue-600';
-          borderColor = 'border-blue-400';
+          bgColor = 'bg-sky-600';
+          borderColor = 'border-sky-400';
           textColor = 'text-white';
         } else if (quest.result === 'fail') {
-          bgColor = 'bg-red-600';
-          borderColor = 'border-red-400';
+          bgColor = 'bg-rose-600';
+          borderColor = 'border-rose-400';
           textColor = 'text-white';
         } else if (isCurrent) {
           bgColor = 'bg-amber-600';
@@ -45,19 +45,19 @@ export default function QuestTracker() {
             data-quest-result={quest.result}
             className={`
               relative flex flex-col items-center justify-center
-              w-12 h-14 rounded-lg border-2 transition-all
+              h-12 w-10 rounded-lg border-2 text-[11px] tabular-nums transition-all sm:h-14 sm:w-12 sm:text-xs
               ${bgColor} ${borderColor}
               ${isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''}
             `}
             title={`任务${questNumber}: 需要${requiredPlayers}人${needsDoubleFail ? '（需2张失败票）' : ''}`}
           >
             {/* 任务编号 */}
-            <span className={`text-xs font-bold ${textColor}`}>
+            <span className={`font-bold ${textColor}`}>
               {questNumber}
             </span>
 
             {/* 需要的人数 */}
-            <span className={`text-sm font-bold ${textColor}`}>
+            <span className={`font-bold ${textColor}`}>
               {requiredPlayers}人
             </span>
 
@@ -73,9 +73,7 @@ export default function QuestTracker() {
 
             {/* 当前任务指示器 */}
             {isCurrent && (
-              <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 text-amber-400 text-xs">
-                ▼
-              </span>
+              <span aria-hidden="true" className="absolute -bottom-1 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-amber-400" />
             )}
           </div>
         );

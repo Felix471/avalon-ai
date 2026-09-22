@@ -73,7 +73,7 @@ function LobbyContent() {
           {/* 左侧：玩家人数 */}
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-400" />
+              <Users aria-hidden="true" className="size-5 text-amber-400" />
               玩家人数
             </h2>
             <div className="grid grid-cols-3 gap-2">
@@ -102,7 +102,7 @@ function LobbyContent() {
           {/* 右侧：AI 模型选择 */}
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-amber-400" />
+              <Bot aria-hidden="true" className="size-5 text-amber-400" />
               AI 模型
             </h2>
             <div className="space-y-2">
@@ -138,7 +138,7 @@ function LobbyContent() {
         {/* 变体规则 */}
         <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700 p-6">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Info className="w-5 h-5 text-amber-400" />
+            <Info aria-hidden="true" className="size-5 text-amber-400" />
             游戏规则变体
           </h2>
 
@@ -232,7 +232,7 @@ function LobbyContent() {
           {hasActiveGame && (
             <div className="bg-amber-900/50 border border-amber-600 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex items-start gap-3 mb-3">
-                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-400" />
                 <div className="text-left">
                   <p className="font-bold text-amber-400">检测到未完成的游戏</p>
                   <p className="text-slate-300 text-sm mt-1">
@@ -246,7 +246,7 @@ function LobbyContent() {
                   onClick={() => router.push('/game')}
                   className="flex-1 bg-green-600 hover:bg-green-500 border-none"
                 >
-                  <ArrowRight className="w-4 h-4 mr-2" />
+                  <ArrowRight aria-hidden="true" className="mr-2 size-4" />
                   继续游戏
                 </Button>
                 <Button
@@ -254,7 +254,7 @@ function LobbyContent() {
                   onClick={resetGame}
                   className="flex-1 border-red-500/30 text-red-400 hover:bg-red-950/30 hover:text-red-300 hover:border-red-500/50"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 aria-hidden="true" className="mr-2 size-4" />
                   放弃并开始新游戏
                 </Button>
               </div>
@@ -272,7 +272,7 @@ function LobbyContent() {
               // 这里保持原样，用户点击会直接覆盖旧游戏
               className="bg-amber-600 hover:bg-amber-500 text-lg px-8 py-6 w-full md:w-auto"
             >
-              <Play className="w-5 h-5 mr-2" />
+              <Play aria-hidden="true" className="mr-2 size-5" />
               {hasActiveGame ? '覆盖并开始新游戏' : '开始游戏'}
             </Button>
           </div>

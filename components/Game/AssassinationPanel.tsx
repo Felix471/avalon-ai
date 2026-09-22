@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
-import { Loader2, Target } from 'lucide-react';
+import { Bot, Loader2, Swords, Target, User } from 'lucide-react';
 import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
+import { panelHeadingClass } from './ui';
 
 export default function AssassinationPanel() {
   const {
@@ -110,14 +111,16 @@ export default function AssassinationPanel() {
   if (!isHumanAssassin && !humanOverride) {
     return (
       <div className="text-center space-y-4">
-        <h2 className="text-xl font-bold text-red-400">🗡️ 刺杀阶段</h2>
+        <h2 className={`${panelHeadingClass} justify-center text-xl text-rose-400`}>
+          <Swords aria-hidden="true" className="size-5" />
+          刺杀阶段
+        </h2>
         <div className="py-8">
-          <div className="text-6xl mb-4">⚔️</div>
           <p className="text-slate-300">
             好人完成了 3 个任务！
           </p>
           <p className="text-slate-300 mt-2">
-            但刺客 <span className="text-red-400">{assassin.name}</span> 有最后一次机会...
+            但刺客 <span className="text-rose-400">{assassin.name}</span> 有最后一次机会...
           </p>
           {seatErrors[assassin.id] ? (
             <div className="mt-4 text-left" title={seatErrorTitles[assassin.id]}>
@@ -132,7 +135,7 @@ export default function AssassinationPanel() {
             </div>
           ) : isAIAssassinating && (
             <div className="mt-4">
-              <Loader2 className="w-8 h-8 animate-spin text-red-400 mx-auto mb-2" />
+              <Loader2 aria-hidden="true" className="mx-auto mb-2 size-5 animate-spin text-rose-400" />
               <p className="text-slate-400">正在选择刺杀目标...</p>
             </div>
           )}
@@ -144,13 +147,16 @@ export default function AssassinationPanel() {
   // 人类刺客选择
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-red-400">🗡️ 你是刺客！</h2>
+      <h2 className={`${panelHeadingClass} text-xl text-rose-400`}>
+        <Swords aria-hidden="true" className="size-5" />
+        你是刺客！
+      </h2>
 
-      <div className="p-4 bg-red-900/20 rounded-lg border border-red-800">
+      <div className="rounded-lg border border-rose-800 bg-rose-900/20 p-4">
         <p className="text-slate-300 text-sm">
           好人完成了 3 个任务，但你有最后一次机会！
         </p>
-        <p className="text-red-300 text-sm mt-2">
+        <p className="mt-2 text-sm text-rose-300">
           如果你能正确刺杀梅林，邪恶阵营将逆转获胜！
         </p>
       </div>
@@ -165,13 +171,17 @@ export default function AssassinationPanel() {
             className={`
               w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left
               ${selectedTarget === player.id
-                ? 'bg-red-500/30 border-2 border-red-500'
+                ? 'bg-rose-500/30 border-2 border-rose-500'
                 : 'bg-slate-700/50 hover:bg-slate-700 border-2 border-transparent'
               }
             `}
           >
-            <Target className={`w-5 h-5 ${selectedTarget === player.id ? 'text-red-400' : 'text-slate-500'}`} />
-            <span className="text-xl">{player.id === humanPlayerId ? '👤' : '🤖'}</span>
+            <Target aria-hidden="true" className={`size-5 ${selectedTarget === player.id ? 'text-rose-400' : 'text-slate-500'}`} />
+            {player.id === humanPlayerId ? (
+              <User aria-hidden="true" className="size-4" />
+            ) : (
+              <Bot aria-hidden="true" className="size-4" />
+            )}
             <div className="flex flex-col">
               <span className="text-white font-medium">
                 {player.id === humanPlayerId ? '你' : `玩家${player.id}`}
@@ -188,9 +198,9 @@ export default function AssassinationPanel() {
         data-testid="assassinate-confirm"
         onClick={handleAssassinate}
         disabled={!selectedTarget}
-        className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50"
+        className="w-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
       >
-        <Target className="w-4 h-4 mr-2" />
+        <Target aria-hidden="true" className="mr-2 size-4" />
         确认刺杀
       </Button>
     </div>

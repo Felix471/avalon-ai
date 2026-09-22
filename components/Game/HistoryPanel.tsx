@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useGameStore } from '@/lib/game/store';
-import { ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, ScrollText, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { chipClass, panelClass, panelHeadingClass, subtleTextClass } from './ui';
 
 export default function HistoryPanel() {
   const { gameState } = useGameStore();
@@ -85,19 +86,21 @@ export default function HistoryPanel() {
 
   if (Object.keys(groupedByQuest).length === 0) {
     return (
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-        <h3 className="text-white font-bold flex items-center gap-2">
-          📜 历史记录
+      <div className={panelClass}>
+        <h3 className={panelHeadingClass}>
+          <ScrollText aria-hidden="true" className="size-5" />
+          历史记录
         </h3>
-        <p className="text-slate-500 text-sm mt-2">暂无投票历史</p>
+        <p className={`${subtleTextClass} mt-2 text-slate-500`}>暂无投票历史</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 max-h-[400px] overflow-y-auto">
-      <h3 className="text-white font-bold flex items-center gap-2 mb-3">
-        📜 历史记录
+    <div className={`${panelClass} max-h-[45vh] overflow-y-auto`}>
+      <h3 className={`${panelHeadingClass} mb-3`}>
+        <ScrollText aria-hidden="true" className="size-5" />
+        历史记录
       </h3>
 
       <div className="space-y-3">
@@ -113,15 +116,19 @@ export default function HistoryPanel() {
                 onClick={() => toggleQuest(questNum)}
                 className="w-full px-3 py-2 bg-slate-700/50 flex items-center justify-between hover:bg-slate-700 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-white font-medium">任务 {questNum}</span>
+                <div className="flex items-center gap-2 tabular-nums">
+                  <span className="font-medium text-white">任务 {questNum}</span>
                   {questResult && (
-                    <span className={`text-xs px-2 py-0.5 rounded ${
+                    <span className={`${chipClass} rounded ${
                       questResult === 'success' 
-                        ? 'bg-blue-500/30 text-blue-300' 
-                        : 'bg-red-500/30 text-red-300'
+                        ? 'bg-sky-500/30 text-sky-300'
+                        : 'bg-rose-500/30 text-rose-300'
                     }`}>
-                      {questResult === 'success' ? '✓ 成功' : '✗ 失败'}
+                      {questResult === 'success' ? (
+                        <><Check aria-hidden="true" className="size-4" />成功</>
+                      ) : (
+                        <><X aria-hidden="true" className="size-4" />失败</>
+                      )}
                     </span>
                   )}
                   <span className="text-slate-400 text-xs">
@@ -129,9 +136,9 @@ export default function HistoryPanel() {
                   </span>
                 </div>
                 {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-slate-400" />
+                  <ChevronUp aria-hidden="true" className="size-4 text-slate-400" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown aria-hidden="true" className="size-4 text-slate-400" />
                 )}
               </button>
 
@@ -149,7 +156,7 @@ export default function HistoryPanel() {
                     >
                       {/* 投票轮次标题 */}
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-slate-400 tabular-nums">
                           第{vote.voteRound}次投票 · 队长: 玩家{vote.leaderId}
                         </span>
                         <span className={`text-xs ${vote.passed ? 'text-green-400' : 'text-red-400'}`}>
@@ -158,7 +165,7 @@ export default function HistoryPanel() {
                       </div>
 
                       {/* 提议的队伍 */}
-                      <div className="text-xs text-slate-300 mb-2">
+                      <div className="mb-2 text-xs text-slate-300 tabular-nums">
                         队伍: {vote.team.map(id => `P${id}`).join(', ')}
                       </div>
 
@@ -179,9 +186,9 @@ export default function HistoryPanel() {
                             >
                               P{player.id}
                               {playerVote ? (
-                                <ThumbsUp className="w-2.5 h-2.5" />
-                              ) : (
-                                <ThumbsDown className="w-2.5 h-2.5" />
+                              <ThumbsUp aria-hidden="true" className="size-3" />
+                            ) : (
+                                <ThumbsDown aria-hidden="true" className="size-3" />
                               )}
                             </span>
                           );

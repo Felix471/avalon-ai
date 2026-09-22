@@ -112,3 +112,18 @@ test('landing page links to the lobby', async ({ page }) => {
   await expect(page).toHaveURL(/\/play$/);
   await expect(page.getByTestId('lobby-start')).toBeVisible();
 });
+
+test('game screen has no horizontal overflow at 360px', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto(LOBBY_PATH);
+  await page.getByTestId('lobby-player-count-5').click();
+  await page.getByTestId('lobby-start').click();
+  await expect(page).toHaveURL(/\/game$/);
+
+  const dimensions = await page.evaluate(() => ({
+    contentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+
+  expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
+});

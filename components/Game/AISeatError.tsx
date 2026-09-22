@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { panelClass } from './ui';
 
 interface AISeatErrorProps {
   playerId: number;
@@ -18,11 +20,11 @@ export default function AISeatError({
   skipLabel = '跳过',
 }: AISeatErrorProps) {
   return (
-    <div data-testid="seat-error" className="space-y-2 rounded-lg border border-red-800 bg-slate-800/70 p-3">
+    <div data-testid="seat-error" className={cn(panelClass, 'space-y-2 border-rose-800 bg-slate-800/70 p-3')}>
       <div className="text-sm font-medium text-amber-300">
         玩家{playerId} ({modelName || 'AI'})
       </div>
-      <div className="text-sm text-red-400">{message}</div>
+      <div className="text-sm text-rose-400">{message}</div>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={onRetry}>
           重试

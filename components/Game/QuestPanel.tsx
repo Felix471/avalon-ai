@@ -5,9 +5,10 @@ import { useGameStore } from '@/lib/game/store';
 import { isPlayerOnCurrentTeam, hasPlayerActed, getQuestTeamMembers } from '@/lib/game/engine';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, Bot, Check, CheckCircle, Loader2, Swords, User, XCircle } from 'lucide-react';
 import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
+import { chipClass, panelClass, panelHeadingClass } from './ui';
 
 export default function QuestPanel() {
   const { gameState, questAction, addSystemEvent } = useGameStore();
@@ -130,10 +131,13 @@ export default function QuestPanel() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">⚔️ 执行任务 {currentQuest}</h2>
+      <h2 className={`${panelHeadingClass} text-xl tabular-nums`}>
+        <Swords aria-hidden="true" className="size-5" />
+        执行任务 {currentQuest}
+      </h2>
 
       {/* 任务队员 */}
-      <div className="p-4 bg-slate-700/50 rounded-lg">
+      <div className={panelClass}>
         <div className="text-slate-400 text-sm mb-2">任务队伍:</div>
         <div className="flex flex-wrap gap-2">
           {teamMembers.map(player => {
@@ -142,15 +146,20 @@ export default function QuestPanel() {
               <span
                 key={player.id}
                 className={`
-                  px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1
+                  ${chipClass} px-3 py-1 text-sm font-medium
                   ${acted 
                     ? 'bg-green-900/50 text-green-300' 
                     : 'bg-slate-600 text-white'
                   }
                 `}
               >
-                {player.id === humanPlayerId ? '👤' : '🤖'} {player.name}
-                {acted && <CheckCircle className="w-3 h-3" />}
+                {player.id === humanPlayerId ? (
+                  <User aria-hidden="true" className="size-4" />
+                ) : (
+                  <Bot aria-hidden="true" className="size-4" />
+                )}
+                {player.name}
+                {acted && <CheckCircle aria-hidden="true" className="size-4" />}
               </span>
             );
           })}
@@ -170,21 +179,22 @@ export default function QuestPanel() {
               <Button
                 data-testid="quest-success"
                 onClick={() => handleAction(true)}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-sky-600 hover:bg-sky-700"
               >
-                <CheckCircle className="w-4 h-4 mr-2" />
+                <CheckCircle aria-hidden="true" className="mr-2 size-4" />
                 任务成功（伪装好人）
               </Button>
               <Button
                 data-testid="quest-fail"
                 onClick={() => handleAction(false)}
-                className="w-full bg-red-600 hover:bg-red-700"
+                className="w-full bg-rose-600 hover:bg-rose-700"
               >
-                <XCircle className="w-4 h-4 mr-2" />
+                <XCircle aria-hidden="true" className="mr-2 size-4" />
                 任务失败（破坏任务）
               </Button>
-              <p className="text-slate-500 text-xs text-center">
-                ⚠️ 选择失败可能会暴露你的身份
+              <p className="flex items-center justify-center gap-1 text-center text-xs text-slate-500">
+                <AlertTriangle aria-hidden="true" className="size-4" />
+                选择失败可能会暴露你的身份
               </p>
             </div>
           ) : (
@@ -193,9 +203,9 @@ export default function QuestPanel() {
               <Button
                 data-testid="quest-success"
                 onClick={() => handleAction(true)}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-sky-600 hover:bg-sky-700"
               >
-                <CheckCircle className="w-4 h-4 mr-2" />
+                <CheckCircle aria-hidden="true" className="mr-2 size-4" />
                 任务成功
               </Button>
               <p className="text-slate-500 text-xs text-center">
@@ -206,7 +216,10 @@ export default function QuestPanel() {
         </div>
       ) : humanOnTeam && humanHasActed ? (
         <div className="text-center py-2">
-          <p className="text-green-400">✓ 你已完成行动</p>
+          <p className="flex items-center justify-center gap-1 text-green-400">
+            <Check aria-hidden="true" className="size-4" />
+            你已完成行动
+          </p>
         </div>
       ) : (
         <div className="text-center py-4 text-slate-400">
@@ -234,7 +247,7 @@ export default function QuestPanel() {
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-slate-400">行动进度</span>
-          <span className="text-slate-300">{actedCount} / {teamMembers.length}</span>
+          <span className="text-slate-300 tabular-nums">{actedCount} / {teamMembers.length}</span>
         </div>
         <div className="w-full bg-slate-700 rounded-full h-2">
           <div
@@ -245,14 +258,15 @@ export default function QuestPanel() {
       </div>
 
       {quest.requiresDoubleFail && (
-        <div className="text-center text-yellow-400 text-sm">
-          ⚠️ 本任务需要 2 张失败票才会失败
+        <div className="flex items-center justify-center gap-1 text-center text-sm text-yellow-400 tabular-nums">
+          <AlertTriangle aria-hidden="true" className="size-4" />
+          本任务需要 2 张失败票才会失败
         </div>
       )}
 
       {actedCount > 0 && actedCount < teamMembers.length && (
         <div className="text-center text-slate-400 text-sm">
-          <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+          <Loader2 aria-hidden="true" className="mr-2 inline size-4 animate-spin" />
           等待其他队员行动...
         </div>
       )}
