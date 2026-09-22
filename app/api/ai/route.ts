@@ -8,6 +8,7 @@ import {
   GenerationSettings,
   ROLES,
 } from '@/lib/game/types';
+import { parseTargetSelection, parseTeamSelection } from '@/lib/game/parsers';
 import { validateSpeechInput, wrapUserInputForAI } from '@/lib/security/inputValidator';
 import {
   buildDiscussionPrompt,
@@ -291,16 +292,15 @@ async function handleTeamBuilding(
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
-  // 解析AI返回的数字
-  const numbers = aiResponse.match(/\d+/g) || [];
-  let team = numbers
-    .map(n => parseInt(n))
-    .filter(n => n >= 1 && n <= gameState.playerCount);
+  // First run of requiredSize distinct valid ids wins; trailing explanations are ignored.
+  const team = parseTeamSelection(
+    aiResponse,
+    gameState.players.map(p => p.id),
+    requiredSize,
+  );
+  debugRaw('team_building', player.aiModel!, aiResponse, team);
 
-  // 去重
-  team = [...new Set(team)];
-
-  if (team.length !== requiredSize) {
+  if (!team) {
     return unparseableResponse(player.aiModel!, aiResponse);
   }
 
@@ -330,10 +330,10 @@ async function handleAssassination(
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
-  const match = aiResponse.match(/\d+/);
-  const targetId = match ? parseInt(match[0]) : -1;
+  const targetId = parseTargetSelection(aiResponse, goodPlayers.map(p => p.id));
+  debugRaw('assassination', player.aiModel!, aiResponse, targetId);
 
-  if (!goodPlayers.find(p => p.id === targetId)) {
+  if (targetId === null) {
     return unparseableResponse(player.aiModel!, aiResponse);
   }
 
