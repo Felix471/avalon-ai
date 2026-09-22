@@ -1,35 +1,36 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore, useHydration } from '@/lib/game/store';
-import { AI_MODELS, type VariantRules } from '@/lib/game/types';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Users, Play, Bot, Info, AlertCircle, Trash2, ArrowRight
+  AI_MODELS,
+  GENERATION_LIMITS,
+  type VariantRules,
+} from '@/lib/game/types';
+import { Button } from '@/components/ui/button';
+import {
+  Users, Play, Bot, Info, AlertCircle, Trash2, ArrowRight, SlidersHorizontal
 } from 'lucide-react';
 
 // ==================== 大厅主组件 ====================
 
 function LobbyContent() {
   const router = useRouter();
-  const [startError, setStartError] = useState<string | null>(null);
   // 添加 gameState 和 resetGame 用于恢复/重置游戏
-  const { config, updateConfig, startGame, gameState, resetGame } = useGameStore();
+  const {
+    config,
+    updateConfig,
+    setSeatModel,
+    setAllSeats,
+    startGame,
+    gameState,
+    resetGame,
+  } = useGameStore();
   // 添加 hydration 检查
   const hydrated = useHydration();
 
   const handlePlayerCountChange = (count: number) => {
     updateConfig({ playerCount: count });
-  };
-
-  const handleModelToggle = (modelId: string) => {
-    const newModels = config.enabledModels.includes(modelId)
-      ? config.enabledModels.filter(id => id !== modelId)
-      : [...config.enabledModels, modelId];
-    updateConfig({ enabledModels: newModels });
-    setStartError(null);
   };
 
   const handleVariantChange = (key: keyof VariantRules, value: VariantRules[keyof VariantRules]) => {
@@ -39,11 +40,6 @@ function LobbyContent() {
   };
 
   const handleStartGame = () => {
-    if (config.enabledModels.length < 2) {
-      setStartError('请至少选择 2 个 AI 模型');
-      return;
-    }
-
     startGame();
     router.push('/game');
   };
@@ -99,39 +95,164 @@ function LobbyContent() {
             </p>
           </div>
 
-          {/* 右侧：AI 模型选择 */}
+          {/* Right: AI seat configuration */}
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Bot aria-hidden="true" className="size-5 text-amber-400" />
-              AI 模型
-            </h2>
-            <div className="space-y-2">
-              {AI_MODELS.map(model => (
-                <label
-                  key={model.id}
-                  className={`
-                    flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all
-                    ${config.enabledModels.includes(model.id)
-                      ? 'bg-slate-700'
-                      : 'bg-slate-800/50 hover:bg-slate-700/50'
-                    }
-                  `}
-                >
-                  <Checkbox
-                    checked={config.enabledModels.includes(model.id)}
-                    onCheckedChange={() => handleModelToggle(model.id)}
-                  />
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: model.color }}
-                  />
-                  <span className="text-white flex-1">{model.name}</span>
-                </label>
-              ))}
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-white">
+                <Bot aria-hidden="true" className="size-5 text-amber-400" />
+                AI 座位 / Seats
+              </h2>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="seats-same"
+                onClick={() => setAllSeats(config.seats[0]?.modelId ?? AI_MODELS[0].id)}
+                className="border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
+              >
+                全部相同
+              </Button>
             </div>
-            <p className="text-slate-500 text-sm mt-3">
-              至少选择 2 个模型（可复用扮演多个角色）
-            </p>
+            <div className="space-y-2">
+              {config.seats.map((seat, index) => {
+                const selectedModel = AI_MODELS.find(model => model.id === seat.modelId)
+                  ?? AI_MODELS[0];
+                return (
+                  <label
+                    key={index}
+                    className="flex items-center gap-3 rounded-lg bg-slate-700/60 p-3"
+                  >
+                    <span className="w-16 shrink-0 text-sm text-slate-300">座位 {index + 1}</span>
+                    <span
+                      aria-hidden="true"
+                      className="size-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: selectedModel.color }}
+                    />
+                    <select
+                      data-testid={`seat-select-${index}`}
+                      value={seat.modelId}
+                      onChange={event => setSeatModel(index, event.target.value)}
+                      className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30"
+                    >
+                      {AI_MODELS.map(model => (
+                        <option key={model.id} value={model.id}>{model.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+
+            <details data-testid="advanced-settings" className="mt-5 border-t border-slate-700 pt-4">
+              <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-slate-200">
+                <SlidersHorizontal aria-hidden="true" className="size-4 text-amber-400" />
+                高级设置
+              </summary>
+              <div className="mt-4 space-y-5">
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium text-slate-300">提示词模式</legend>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="radio"
+                        name="prompt-mode"
+                        value="full"
+                        data-testid="prompt-mode-full"
+                        checked={config.promptMode === 'full'}
+                        onChange={() => updateConfig({ promptMode: 'full' })}
+                        className="accent-amber-500"
+                      />
+                      完整策略
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="radio"
+                        name="prompt-mode"
+                        value="naive"
+                        data-testid="prompt-mode-naive"
+                        checked={config.promptMode === 'naive'}
+                        onChange={() => updateConfig({ promptMode: 'naive' })}
+                        className="accent-amber-500"
+                      />
+                      基础
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-500">基础模式是实验中的对照组。</p>
+                </fieldset>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <label htmlFor="temperature" className="font-medium text-slate-300">温度</label>
+                    <span className="tabular-nums text-slate-400">
+                      {config.generation.temperature ?? '提供方默认'}
+                    </span>
+                  </div>
+                  <input
+                    id="temperature"
+                    type="range"
+                    min={GENERATION_LIMITS.temperature.min}
+                    max={GENERATION_LIMITS.temperature.max}
+                    step={GENERATION_LIMITS.temperature.step}
+                    data-testid="temperature"
+                    value={config.generation.temperature ?? 0.7}
+                    disabled={config.generation.temperature === undefined}
+                    onChange={event => updateConfig({
+                      generation: {
+                        ...config.generation,
+                        temperature: Number(event.target.value),
+                      },
+                    })}
+                    className="w-full accent-amber-500 disabled:opacity-40"
+                  />
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+                    <input
+                      type="checkbox"
+                      data-testid="temperature-default"
+                      checked={config.generation.temperature === undefined}
+                      onChange={event => updateConfig({
+                        generation: event.target.checked
+                          ? { maxTokens: config.generation.maxTokens }
+                          : { ...config.generation, temperature: 0.7 },
+                      })}
+                      className="accent-amber-500"
+                    />
+                    使用提供方默认
+                  </label>
+                </div>
+
+                <label className="block space-y-2 text-sm">
+                  <span className="font-medium text-slate-300">最大输出 tokens</span>
+                  <input
+                    type="number"
+                    min={GENERATION_LIMITS.maxTokens.min}
+                    max={GENERATION_LIMITS.maxTokens.max}
+                    data-testid="max-tokens"
+                    value={config.generation.maxTokens}
+                    onChange={event => updateConfig({
+                      generation: {
+                        ...config.generation,
+                        maxTokens: Math.min(
+                          GENERATION_LIMITS.maxTokens.max,
+                          Math.max(GENERATION_LIMITS.maxTokens.min, Number(event.target.value)),
+                        ),
+                      },
+                    })}
+                    className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-white outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30"
+                  />
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    data-testid="quick-mode"
+                    checked={config.quickMode}
+                    onChange={event => updateConfig({ quickMode: event.target.checked })}
+                    className="mt-0.5 accent-amber-500"
+                  />
+                  每次组队只讨论一轮（更快、更便宜）
+                </label>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -263,7 +384,6 @@ function LobbyContent() {
 
           {/* 如果有未完成的游戏，可以考虑禁用下面的按钮，或者保留让用户强制覆盖 */}
           <div className="text-center">
-            {startError && <p className="text-red-400 text-sm">{startError}</p>}
             <Button
               data-testid="lobby-start"
               onClick={handleStartGame}

@@ -97,6 +97,31 @@ describe('parseAIRequest', () => {
     expectInvalid({ ...makeRequest(), promptMode: 'weird' }, 'promptMode');
   });
 
+  it.each([1.6, -0.1])('rejects generation temperature %s', (temperature) => {
+    expectInvalid({
+      ...makeRequest(),
+      generation: { temperature, maxTokens: 300 },
+    }, 'generation.temperature');
+  });
+
+  it.each([99, 1501])('rejects generation maxTokens %s', (maxTokens) => {
+    expectInvalid({
+      ...makeRequest(),
+      generation: { maxTokens },
+    }, 'generation.maxTokens');
+  });
+
+  it.each([100, 1500])('accepts generation maxTokens boundary %s', (maxTokens) => {
+    expect(parseAIRequest({
+      ...makeRequest(),
+      generation: { maxTokens },
+    }).ok).toBe(true);
+  });
+
+  it('accepts an omitted generation object', () => {
+    expect(parseAIRequest(makeRequest()).ok).toBe(true);
+  });
+
   it('tolerates extra gameState fields because the client state object is loose', () => {
     const request = makeRequest();
     const body = {

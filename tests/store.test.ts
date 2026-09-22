@@ -4,7 +4,7 @@ import {
   PhaseProgress,
   useGameStore,
 } from '@/lib/game/store';
-import { GameConfig, GameState } from '@/lib/game/types';
+import { AI_MODELS, GameConfig, GameState } from '@/lib/game/types';
 
 describe('game store phase progress persistence', () => {
   beforeEach(() => {
@@ -75,8 +75,8 @@ describe('game store phase progress persistence', () => {
       pendingVotes: Record<number, boolean>;
     };
 
-    expect(migrated.config).toBe(config);
-    expect(migrated.gameState).toBe(gameState);
+    expect(migrated.config).toMatchObject(config);
+    expect(migrated.gameState).toMatchObject(gameState!);
     expect(migrated.phaseProgress).toEqual({
       key: getPhaseKey(gameState),
       discussion: { step: 0, speeches: [] },
@@ -86,7 +86,7 @@ describe('game store phase progress persistence', () => {
     expect(migrated.pendingVotes).toEqual({});
   });
 
-  it('preserves saved player-count choices in the version 3 migration', async () => {
+  it('preserves saved player-count choices while filling missing migration defaults', async () => {
     const migrate = useGameStore.persist.getOptions().migrate;
     expect(migrate).toBeDefined();
 
@@ -97,6 +97,43 @@ describe('game store phase progress persistence', () => {
     };
 
     expect(migrated.config.playerCount).toBe(8);
-    expect(missingPlayerCount.config.playerCount).toBeUndefined();
+    expect(missingPlayerCount.config.playerCount).toBe(5);
+  });
+
+  it('migrates a version 3 config from enabledModels to one AI seat per non-human player', async () => {
+    const migrate = useGameStore.persist.getOptions().migrate;
+    expect(migrate).toBeDefined();
+    const savedConfig = {
+      playerCount: 7,
+      enabledModels: [AI_MODELS[1].id, AI_MODELS[3].id],
+      roles: [],
+      questSizes: [],
+      variantRules: useGameStore.getState().config.variantRules,
+    };
+
+    const migrated = await migrate!({ config: savedConfig }, 3) as { config: GameConfig };
+
+    expect(migrated.config.seats).toHaveLength(savedConfig.playerCount - 1);
+    expect(migrated.config.seats.map(seat => seat.modelId)).toEqual([
+      AI_MODELS[1].id,
+      AI_MODELS[3].id,
+      AI_MODELS[1].id,
+      AI_MODELS[3].id,
+      AI_MODELS[1].id,
+      AI_MODELS[3].id,
+    ]);
+    expect(migrated.config).toMatchObject({
+      promptMode: 'full',
+      quickMode: false,
+      generation: { maxTokens: 300 },
+    });
+  });
+
+  it('sets every AI seat to the same model', () => {
+    useGameStore.getState().setAllSeats(AI_MODELS[1].id);
+
+    const config = useGameStore.getState().config;
+    expect(config.seats.every(seat => seat.modelId === AI_MODELS[1].id)).toBe(true);
+    expect(config.enabledModels).toEqual([AI_MODELS[1].id]);
   });
 });

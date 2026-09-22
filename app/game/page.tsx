@@ -19,7 +19,17 @@ import AssassinFloatingButton from '@/components/Game/AssassinFloatingButton';
 import VisionPanel from '@/components/Game/VisionPanel';
 import { ExitGameButton } from '@/components/Game/ExitGameButton';
 import { panelClass, panelHeadingClass, subtleTextClass } from '@/components/Game/ui';
-import { ScrollText, Swords } from 'lucide-react';
+import { DISCUSSION_ROUNDS } from '@/lib/game/types';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ScrollText, Settings, Swords } from 'lucide-react';
 
 export default function GamePage() {
   const router = useRouter();
@@ -95,6 +105,55 @@ export default function GamePage() {
             <div className="order-last flex basis-full justify-end sm:order-none sm:basis-auto">
               <QuestTracker />
             </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  data-testid="settings-open"
+                  aria-label="查看本局设置"
+                  className="border-slate-600 bg-slate-800/70 text-slate-200 hover:bg-slate-700 hover:text-white"
+                >
+                  <Settings aria-hidden="true" className="size-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="border-slate-700 bg-slate-900 text-white">
+                <DialogHeader>
+                  <DialogTitle>本局设置</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    本局设置在开局时固定。
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <h3 className="mb-2 font-medium text-slate-200">AI 座位 / Seats</h3>
+                    <div className="space-y-1 text-slate-300">
+                      {gameState.players.filter(player => !player.isHuman).map(player => (
+                        <div key={player.id} className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="size-2.5 rounded-full"
+                            style={{ backgroundColor: player.aiModel?.color }}
+                          />
+                          <span>座位 {player.id}：{player.aiModel?.name ?? '未知模型'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-slate-300">
+                    <dt>提示词模式：</dt>
+                    <dd>{gameState.promptMode === 'naive' ? '基础' : '完整策略'}</dd>
+                    <dt>温度：</dt>
+                    <dd>{gameState.generation.temperature ?? '提供方默认'}</dd>
+                    <dt>最大输出 tokens：</dt>
+                    <dd>{gameState.generation.maxTokens}</dd>
+                    <dt>讨论轮数：</dt>
+                    <dd>{gameState.discussionRounds ?? DISCUSSION_ROUNDS}</dd>
+                  </dl>
+                </div>
+              </DialogContent>
+            </Dialog>
             <ExitGameButton />
           </div>
         </div>

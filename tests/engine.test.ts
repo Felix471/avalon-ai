@@ -11,6 +11,7 @@ import {
 } from '@/lib/game/engine';
 import {
   AI_MODELS,
+  DEFAULT_GENERATION,
   GameConfig,
   GameState,
   QUEST_SIZES,
@@ -22,6 +23,12 @@ function makeConfig(playerCount: number): GameConfig {
   return {
     playerCount,
     enabledModels: AI_MODELS.map(model => model.id),
+    seats: Array.from({ length: playerCount - 1 }, (_, index) => ({
+      modelId: AI_MODELS[index % AI_MODELS.length].id,
+    })),
+    generation: DEFAULT_GENERATION,
+    promptMode: 'full',
+    quickMode: false,
     roles: ROLE_CONFIGS[playerCount],
     questSizes: QUEST_SIZES[playerCount],
     variantRules: {
@@ -71,6 +78,26 @@ describe('createGame', () => {
     expect(state.quests.map(quest => quest.requiresDoubleFail)).toEqual(
       [false, false, false, playerCount >= 7, false],
     );
+  });
+
+  it('assigns explicit seat models in order and enables one discussion round in quick mode', () => {
+    const config = makeConfig(5);
+    config.seats = [
+      { modelId: AI_MODELS[4].id },
+      { modelId: AI_MODELS[3].id },
+      { modelId: AI_MODELS[2].id },
+      { modelId: AI_MODELS[1].id },
+    ];
+    config.quickMode = true;
+
+    const state = createGame(config);
+
+    expect(
+      state.players.filter(player => !player.isHuman).map(player => player.aiModel?.id),
+    ).toEqual(config.seats.map(seat => seat.modelId));
+    expect(state.discussionRounds).toBe(1);
+    expect(state.promptMode).toBe('full');
+    expect(state.generation).toEqual(DEFAULT_GENERATION);
   });
 });
 

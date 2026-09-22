@@ -251,4 +251,41 @@ describe('callAIProvider', () => {
     expect(bodies[3]).toMatchObject({ max_completion_tokens: 300 });
     expect(bodies[3]).not.toHaveProperty('max_tokens');
   });
+
+  it('threads explicit generation settings into OpenAI and Google bodies', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
+      return Promise.resolve(
+        String(input).includes('googleapis.com')
+          ? response({ candidates: [{ content: { parts: [{ text: 'OK' }] } }] })
+          : openAIResponse(),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const context = { generation: { temperature: 0.3, maxTokens: 500 } };
+
+    await callAIProvider(model('openai', 'gpt-5.4-mini'), 'prompt', 'discussion', context);
+    await callAIProvider(model('google', 'gemini-test'), 'prompt', 'discussion', context);
+
+    const openAIBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const googleBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(openAIBody).toMatchObject({ max_completion_tokens: 500, temperature: 0.3 });
+    expect(googleBody.generationConfig).toMatchObject({
+      maxOutputTokens: 500,
+      temperature: 0.3,
+    });
+  });
+
+  it('omits temperature when OpenAI uses the provider default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(openAIResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callAIProvider(model('openai', 'gpt-5.4-mini'), 'prompt', 'discussion', {
+      generation: { maxTokens: 500 },
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body).toMatchObject({ max_completion_tokens: 500 });
+    expect(body).not.toHaveProperty('temperature');
+  });
 });

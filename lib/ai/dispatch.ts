@@ -8,7 +8,11 @@
  */
 
 import { isMockAIEnabled, mockAIResponse } from './mockProvider';
-import { GameState } from '@/lib/game/types';
+import {
+  DEFAULT_GENERATION,
+  GameState,
+  GenerationSettings,
+} from '@/lib/game/types';
 
 export type AIProviderResult =
   | { ok: true; text: string; latencyMs: number; attempts: number }
@@ -34,7 +38,12 @@ const isReasoningModel = (model: string) =>
 
 // ==================== Provider Call Functions ====================
 
-async function callAnthropic(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function callAnthropic(
+  model: string,
+  prompt: string,
+  signal: AbortSignal,
+  generation: GenerationSettings,
+): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new ProviderError('missing_api_key');
@@ -49,7 +58,8 @@ async function callAnthropic(model: string, prompt: string, signal: AbortSignal)
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      max_tokens: generation.maxTokens,
+      ...(generation.temperature === undefined ? {} : { temperature: generation.temperature }),
       messages: [{ role: 'user', content: prompt }],
     }),
     signal,
@@ -65,7 +75,12 @@ async function callAnthropic(model: string, prompt: string, signal: AbortSignal)
   return data.content?.[0]?.text || '';
 }
 
-async function callOpenAI(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function callOpenAI(
+  model: string,
+  prompt: string,
+  signal: AbortSignal,
+  generation: GenerationSettings,
+): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new ProviderError('missing_api_key');
@@ -79,7 +94,10 @@ async function callOpenAI(model: string, prompt: string, signal: AbortSignal): P
     },
     body: JSON.stringify({
       model,
-      ...(isReasoningModel(model) ? { max_completion_tokens: 300 } : { max_tokens: 300 }),
+      ...(isReasoningModel(model)
+        ? { max_completion_tokens: generation.maxTokens }
+        : { max_tokens: generation.maxTokens }),
+      ...(generation.temperature === undefined ? {} : { temperature: generation.temperature }),
       messages: [{ role: 'user', content: prompt }],
     }),
     signal,
@@ -95,7 +113,12 @@ async function callOpenAI(model: string, prompt: string, signal: AbortSignal): P
   return data.choices?.[0]?.message?.content || '';
 }
 
-async function callGoogle(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function callGoogle(
+  model: string,
+  prompt: string,
+  signal: AbortSignal,
+  generation: GenerationSettings,
+): Promise<string> {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     throw new ProviderError('missing_api_key');
@@ -121,8 +144,8 @@ async function callGoogle(model: string, prompt: string, signal: AbortSignal): P
       parts: [{ text: prompt + '\n\n【直接输出你的游戏发言，不要任何前缀或思考过程】' }]
     }],
     generationConfig: {
-      maxOutputTokens: 4096,
-      temperature: 0.7,
+      maxOutputTokens: generation.maxTokens,
+      temperature: generation.temperature ?? 0.7,
       thinkingConfig: { thinkingLevel: 'low' },
     },
     safetySettings: [
@@ -169,7 +192,12 @@ async function callGoogle(model: string, prompt: string, signal: AbortSignal): P
   return text;
 }
 
-async function callDeepSeek(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function callDeepSeek(
+  model: string,
+  prompt: string,
+  signal: AbortSignal,
+  generation: GenerationSettings,
+): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     throw new ProviderError('missing_api_key');
@@ -183,7 +211,8 @@ async function callDeepSeek(model: string, prompt: string, signal: AbortSignal):
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      max_tokens: generation.maxTokens,
+      ...(generation.temperature === undefined ? {} : { temperature: generation.temperature }),
       thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -200,7 +229,12 @@ async function callDeepSeek(model: string, prompt: string, signal: AbortSignal):
   return data.choices?.[0]?.message?.content || '';
 }
 
-async function callXAI(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+async function callXAI(
+  model: string,
+  prompt: string,
+  signal: AbortSignal,
+  generation: GenerationSettings,
+): Promise<string> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
     throw new ProviderError('missing_api_key');
@@ -214,7 +248,8 @@ async function callXAI(model: string, prompt: string, signal: AbortSignal): Prom
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      max_tokens: generation.maxTokens,
+      ...(generation.temperature === undefined ? {} : { temperature: generation.temperature }),
       reasoning_effort: 'none',
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -250,7 +285,11 @@ export async function callAIProvider(
   model: { provider: string; model: string; name?: string },
   prompt: string,
   action: string,
-  context?: { gameState?: GameState; playerId?: number },
+  context?: {
+    gameState?: GameState;
+    playerId?: number;
+    generation?: GenerationSettings;
+  },
 ): Promise<AIProviderResult> {
   if (isMockAIEnabled()) {
     if (!hasLoggedMockProvider) {
@@ -269,6 +308,7 @@ export async function callAIProvider(
   const INITIAL_DELAY_MS = 2000;
   const REQUEST_TIMEOUT_MS = 30_000;
   const startedAt = Date.now();
+  const generation = context?.generation ?? DEFAULT_GENERATION;
   let attempts = 0;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -280,19 +320,19 @@ export async function callAIProvider(
       let text: string;
       switch (model.provider) {
         case 'anthropic':
-          text = await callAnthropic(model.model, prompt, controller.signal);
+          text = await callAnthropic(model.model, prompt, controller.signal, generation);
           break;
         case 'openai':
-          text = await callOpenAI(model.model, prompt, controller.signal);
+          text = await callOpenAI(model.model, prompt, controller.signal, generation);
           break;
         case 'google':
-          text = await callGoogle(model.model, prompt, controller.signal);
+          text = await callGoogle(model.model, prompt, controller.signal, generation);
           break;
         case 'deepseek':
-          text = await callDeepSeek(model.model, prompt, controller.signal);
+          text = await callDeepSeek(model.model, prompt, controller.signal, generation);
           break;
         case 'xai':
-          text = await callXAI(model.model, prompt, controller.signal);
+          text = await callXAI(model.model, prompt, controller.signal, generation);
           break;
         default:
           console.error(`[AI_CALL] Unknown provider: ${model.provider}`);

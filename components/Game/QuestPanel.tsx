@@ -53,6 +53,8 @@ export default function QuestPanel() {
             gameState,
             playerId,
             action: 'quest',
+            promptMode: gameState.promptMode,
+            generation: gameState.generation,
           }),
         });
 

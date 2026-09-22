@@ -1,7 +1,8 @@
 import {
   GameState, GameConfig, Player, Quest, GameEvent, GamePhase,
   RoleType, Team, AIModel, AI_MODELS, ROLES,
-  ROLE_CONFIGS, QUEST_SIZES, DOUBLE_FAIL_QUESTS, VariantRules
+  ROLE_CONFIGS, QUEST_SIZES, DOUBLE_FAIL_QUESTS, VariantRules,
+  DISCUSSION_ROUNDS
 } from './types';
 
 // ==================== 工具函数 ====================
@@ -22,10 +23,21 @@ function generateId(): string {
 // ==================== 游戏初始化 ====================
 
 export function createGame(config: GameConfig): GameState {
-  const { playerCount, enabledModels, variantRules } = config;
+  const {
+    playerCount,
+    enabledModels,
+    variantRules,
+    promptMode,
+    generation,
+    quickMode,
+  } = config;
 
   const availableModels = AI_MODELS.filter(m => enabledModels.includes(m.id));
   const shuffledModels = shuffleArray(availableModels);
+  const firstEnabledModel = enabledModels
+    .map(id => AI_MODELS.find(model => model.id === id))
+    .find((model): model is AIModel => model !== undefined) ?? AI_MODELS[0];
+  const hasExplicitSeats = config.seats.length === playerCount - 1;
 
   const players: Player[] = [];
   const humanPlayerId = Math.floor(Math.random() * playerCount) + 1;
@@ -35,7 +47,10 @@ export function createGame(config: GameConfig): GameState {
     if (i === humanPlayerId) {
       players.push({ id: i, name: '你', isHuman: true });
     } else {
-      const model = shuffledModels[modelIndex % shuffledModels.length];
+      const model = hasExplicitSeats
+        ? AI_MODELS.find(candidate => candidate.id === config.seats[modelIndex].modelId)
+          ?? firstEnabledModel
+        : shuffledModels[modelIndex % shuffledModels.length] ?? firstEnabledModel;
       modelIndex++;
       players.push({ id: i, name: model.name, isHuman: false, aiModel: model });
     }
@@ -75,6 +90,9 @@ export function createGame(config: GameConfig): GameState {
     evilWins: 0,
     events: [],
     discussionRound: 1,
+    discussionRounds: quickMode ? 1 : DISCUSSION_ROUNDS,
+    promptMode,
+    generation: { ...generation },
   };
 }
 

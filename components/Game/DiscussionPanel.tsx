@@ -194,8 +194,8 @@ export default function DiscussionPanel() {
     ...players.slice(0, currentLeaderIndex)
   ];
 
-  // One discussion phase now costs 2 × (players − 1) model calls.
-  const totalSpeakingSteps = DISCUSSION_ROUNDS * players.length;
+  const discussionRounds = gameState?.discussionRounds ?? DISCUSSION_ROUNDS;
+  const totalSpeakingSteps = discussionRounds * players.length;
   const currentSpeaker = speakingOrder[currentSpeakerIndex % players.length];
   const isHumanTurn = currentSpeaker?.id === humanPlayerId;
   const allSpoken = currentSpeakerIndex >= totalSpeakingSteps;
@@ -235,6 +235,8 @@ export default function DiscussionPanel() {
           playerId,
           action: 'discussion',
           recentSpeeches: getRecentSpeeches(),
+          promptMode: gameState.promptMode,
+          generation: gameState.generation,
         }),
       });
 

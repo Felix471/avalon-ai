@@ -1,5 +1,6 @@
 import {
   AI_MODELS,
+  DEFAULT_GENERATION,
   DOUBLE_FAIL_QUESTS,
   GameState,
   QUEST_SIZES,
@@ -43,6 +44,9 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
     evilWins: 0,
     events: [],
     discussionRound: 1,
+    discussionRounds: 2,
+    promptMode: 'full',
+    generation: DEFAULT_GENERATION,
   };
 
   return { ...state, ...overrides };

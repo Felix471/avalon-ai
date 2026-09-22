@@ -57,6 +57,8 @@ export default function VotingPanel() {
           gameState,
           playerId,
           action: 'voting',
+          promptMode: gameState.promptMode,
+          generation: gameState.generation,
         }),
       });
 

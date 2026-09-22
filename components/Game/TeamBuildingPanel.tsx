@@ -59,6 +59,8 @@ export default function TeamBuildingPanel() {
           gameState,
           playerId,
           action: 'team_building',
+          promptMode: gameState.promptMode,
+          generation: gameState.generation,
         }),
       });
       const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';

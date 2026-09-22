@@ -193,6 +193,22 @@ export interface VariantRules {
   fifthVoteRule: 'auto_fail' | 'force_team' | 'evil_wins';
 }
 
+export interface SeatConfig {
+  modelId: string;
+}
+
+export interface GenerationSettings {
+  temperature?: number;
+  maxTokens: number;
+}
+
+export const DEFAULT_GENERATION: GenerationSettings = { maxTokens: 300 };
+
+export const GENERATION_LIMITS = {
+  temperature: { min: 0, max: 1.5, step: 0.1 },
+  maxTokens: { min: 100, max: 1500 },
+} as const;
+
 // ==================== 游戏状态 ====================
 
 export interface GameState {
@@ -215,6 +231,9 @@ export interface GameState {
   currentProposedTeam?: number[];
   currentVotes?: Record<number, boolean>;
   discussionRound?: number;
+  discussionRounds?: number;
+  promptMode: 'full' | 'naive';
+  generation: GenerationSettings;
 }
 
 // ==================== 游戏配置 ====================
@@ -222,6 +241,10 @@ export interface GameState {
 export interface GameConfig {
   playerCount: number;
   enabledModels: string[];
+  seats: SeatConfig[];
+  generation: GenerationSettings;
+  promptMode: 'full' | 'naive';
+  quickMode: boolean;
   roles: RoleType[];
   questSizes: number[];
   variantRules: VariantRules;

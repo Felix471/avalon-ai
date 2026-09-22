@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { useSyncExternalStore } from 'react';
 import {
-  GameState, GameConfig, GamePhase, AI_MODELS, VariantRules
+  GameState, GameConfig, GamePhase, AI_MODELS, VariantRules,
+  DEFAULT_GENERATION, DISCUSSION_ROUNDS, SeatConfig
 } from './types';
 import {
   createGame, proposeTeam, submitVote, submitQuestAction,
@@ -44,6 +45,8 @@ interface GameStore {
   // 游戏配置（大厅阶段）
   config: GameConfig;
   updateConfig: (updates: Partial<GameConfig>) => void;
+  setSeatModel: (index: number, modelId: string) => void;
+  setAllSeats: (modelId: string) => void;
 
   // 游戏状态
   gameState: GameState | null;
@@ -101,11 +104,50 @@ const defaultVariantRules: VariantRules = {
 
 const defaultConfig: GameConfig = {
   playerCount: 5,
-  enabledModels: AI_MODELS.map(m => m.id),
+  seats: AI_MODELS.slice(0, 4).map(model => ({ modelId: model.id })),
+  enabledModels: AI_MODELS.slice(0, 4).map(model => model.id),
+  generation: DEFAULT_GENERATION,
+  promptMode: 'full',
+  quickMode: false,
   roles: [],
   questSizes: [],
   variantRules: defaultVariantRules,
 };
+
+function resizeSeats(seats: SeatConfig[], playerCount: number): SeatConfig[] {
+  return Array.from({ length: playerCount - 1 }, (_, index) => (
+    seats[index] ?? { modelId: AI_MODELS[index % AI_MODELS.length].id }
+  ));
+}
+
+function modelIdsForSeats(seats: SeatConfig[]): string[] {
+  return [...new Set(seats.map(seat => seat.modelId))];
+}
+
+function migrateConfig(config: Partial<GameConfig>): GameConfig {
+  const playerCount = config.playerCount ?? defaultConfig.playerCount;
+  const legacyModelIds = config.enabledModels?.length
+    ? config.enabledModels
+    : AI_MODELS.map(model => model.id);
+  const sourceSeats = config.seats?.length
+    ? config.seats
+    : Array.from({ length: playerCount - 1 }, (_, index) => ({
+        modelId: legacyModelIds[index % legacyModelIds.length],
+      }));
+  const seats = resizeSeats(sourceSeats, playerCount);
+
+  return {
+    ...defaultConfig,
+    ...config,
+    playerCount,
+    seats,
+    enabledModels: modelIdsForSeats(seats),
+    generation: { ...DEFAULT_GENERATION, ...config.generation },
+    promptMode: config.promptMode ?? 'full',
+    quickMode: config.quickMode ?? false,
+    variantRules: { ...defaultVariantRules, ...config.variantRules },
+  };
+}
 
 // ============ Hydration 状态管理 ============
 let hasHydrated = false;
@@ -203,9 +245,44 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      updateConfig: (updates) => set(state => ({
-        config: { ...state.config, ...updates }
-      })),
+      updateConfig: (updates) => set(state => {
+        const playerCount = updates.playerCount ?? state.config.playerCount;
+        const seats = resizeSeats(updates.seats ?? state.config.seats, playerCount);
+        return {
+          config: {
+            ...state.config,
+            ...updates,
+            playerCount,
+            seats,
+            enabledModels: modelIdsForSeats(seats),
+          },
+        };
+      }),
+
+      setSeatModel: (index, modelId) => set(state => {
+        if (index < 0 || index >= state.config.seats.length) return state;
+        const seats = state.config.seats.map((seat, seatIndex) => (
+          seatIndex === index ? { modelId } : seat
+        ));
+        return {
+          config: {
+            ...state.config,
+            seats,
+            enabledModels: modelIdsForSeats(seats),
+          },
+        };
+      }),
+
+      setAllSeats: (modelId) => set(state => {
+        const seats = state.config.seats.map(() => ({ modelId }));
+        return {
+          config: {
+            ...state.config,
+            seats,
+            enabledModels: modelIdsForSeats(seats),
+          },
+        };
+      }),
 
       startGame: () => {
         const { config } = get();
@@ -252,7 +329,7 @@ export const useGameStore = create<GameStore>()(
       nextDiscussionRound: () => set(state => {
         if (!state.gameState) return state;
         const currentRound = state.gameState.discussionRound || 1;
-        if (currentRound >= 2) {
+        if (currentRound >= (state.gameState.discussionRounds ?? DISCUSSION_ROUNDS)) {
           // 发言结束，标记本任务已发言，进入组队
           return {
             gameState: {
@@ -374,7 +451,7 @@ export const useGameStore = create<GameStore>()(
         return localStorage;
       }),
       // Persist durable game data without serializing store actions.
-      version: 3,
+      version: 4,
       partialize: (state) => ({
         config: state.config,
         gameState: state.gameState,
@@ -390,9 +467,19 @@ export const useGameStore = create<GameStore>()(
             pendingVotes: {},
           };
         }
-        if (version < 3) {
-          // Version 3 changes only the default; preserve saved config, including an absent playerCount.
-          return state;
+        if (version < 4) {
+          const config = migrateConfig(state.config ?? {});
+          const gameState = state.gameState
+            ? {
+                ...state.gameState,
+                promptMode: state.gameState.promptMode ?? config.promptMode,
+                generation: state.gameState.generation ?? config.generation,
+                discussionRounds:
+                  state.gameState.discussionRounds
+                  ?? (config.quickMode ? 1 : DISCUSSION_ROUNDS),
+              }
+            : state.gameState;
+          state = { ...state, config, gameState };
         }
         return state;
       },

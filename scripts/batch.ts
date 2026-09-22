@@ -21,7 +21,7 @@ import * as path from 'path';
 import pLimit from 'p-limit';
 import {
   GameState, GameConfig, Player, ROLES, QUEST_SIZES, DISCUSSION_ROUNDS,
-  ROLE_CONFIGS, DOUBLE_FAIL_QUESTS, AIModel,
+  ROLE_CONFIGS, DOUBLE_FAIL_QUESTS, AIModel, DEFAULT_GENERATION,
 } from '../lib/game/types';
 import {
   createGame, getCurrentLeader, addEvent, proposeTeam,
@@ -150,11 +150,15 @@ function parseArgs(): { games: number; configNames: string[] } {
 
 // ==================== Game Setup ====================
 
-function createHeadlessGame(models: AIModel[]): GameState {
+function createHeadlessGame(models: AIModel[], promptMode: PromptMode): GameState {
   const playerCount = models.length;
   const config: GameConfig = {
     playerCount,
     enabledModels: models.map(m => m.id),
+    seats: models.slice(0, playerCount - 1).map(model => ({ modelId: model.id })),
+    generation: DEFAULT_GENERATION,
+    promptMode,
+    quickMode: false,
     roles: ROLE_CONFIGS[playerCount],
     questSizes: QUEST_SIZES[playerCount],
     variantRules: {
@@ -212,7 +216,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
   const mode: PromptMode = config.promptMode;
 
   // 1. Create game
-  let state = createHeadlessGame(config.models);
+  let state = createHeadlessGame(config.models, mode);
   const gameId = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   // 2. Skip role_reveal → discussion
@@ -233,13 +237,15 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'discussion': {
         // Replicates store.ts:137 nextDiscussionRound logic.
         // Source-of-truth: lib/game/store.ts:137-148
-        for (let round = 1; round <= DISCUSSION_ROUNDS; round++) {
+        const discussionRounds = state.discussionRounds ?? DISCUSSION_ROUNDS;
+        for (let round = 1; round <= discussionRounds; round++) {
           const speakers = getSpeakerOrder(state);
           for (const player of speakers) {
             const prompt = buildDiscussionPrompt(state, player.id, recentSpeeches, mode);
             const result = await callAIProvider(player.aiModel!, prompt, 'discussion', {
               gameState: state,
               playerId: player.id,
+              generation: DEFAULT_GENERATION,
             });
             let speech: string;
             let providerFallback = false;
@@ -279,7 +285,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
             });
             llmCallCount++;
           }
-          if (round < DISCUSSION_ROUNDS) {
+          if (round < discussionRounds) {
             state = { ...state, discussionRound: round + 1 };
           }
         }

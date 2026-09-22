@@ -56,6 +56,8 @@ export default function AssassinationPanel() {
           gameState,
           playerId,
           action: 'assassination',
+          promptMode: gameState.promptMode,
+          generation: gameState.generation,
         }),
       });
 

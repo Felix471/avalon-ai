@@ -108,9 +108,22 @@ test('lobby renders', async ({ page }) => {
   await page.goto(LOBBY_PATH);
 
   await expect(page.getByTestId('lobby-start')).toBeVisible();
-  for (const model of AI_MODELS) {
-    await expect(page.getByText(model.name, { exact: true })).toBeVisible();
+  const advancedSettings = page.getByTestId('advanced-settings');
+  await advancedSettings.locator('summary').click();
+  await page.getByTestId('quick-mode').check();
+  await page.getByTestId('seat-select-0').selectOption(AI_MODELS[1].id);
+  await page.getByTestId('seats-same').click();
+
+  const seatSelects = page.getByTestId(/^seat-select-\d+$/);
+  await expect(seatSelects).toHaveCount(4);
+  for (let index = 0; index < await seatSelects.count(); index += 1) {
+    await expect(seatSelects.nth(index)).toHaveValue(AI_MODELS[1].id);
   }
+
+  await page.getByTestId('lobby-start').click();
+  await expect(page).toHaveURL(/\/game$/);
+  await page.getByTestId('settings-open').click();
+  await expect(page.getByRole('dialog')).toContainText('讨论轮数：1');
 });
 
 test('landing page links to the lobby', async ({ page }) => {
