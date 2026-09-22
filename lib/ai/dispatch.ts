@@ -12,7 +12,12 @@ import {
   DEFAULT_GENERATION,
   GameState,
   GenerationSettings,
+  VERDICT_ACTIONS,
+  resolveMaxTokens,
 } from '@/lib/game/types';
+
+/** Generation settings with the output cap already resolved for the action. */
+type ResolvedGeneration = { temperature?: number; maxTokens: number };
 
 export type AIProviderResult =
   | { ok: true; text: string; latencyMs: number; attempts: number }
@@ -42,7 +47,7 @@ async function callAnthropic(
   model: string,
   prompt: string,
   signal: AbortSignal,
-  generation: GenerationSettings,
+  generation: ResolvedGeneration,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -93,7 +98,7 @@ async function callOpenAI(
   model: string,
   prompt: string,
   signal: AbortSignal,
-  generation: GenerationSettings,
+  generation: ResolvedGeneration,
 ): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -131,7 +136,7 @@ async function callGoogle(
   model: string,
   prompt: string,
   signal: AbortSignal,
-  generation: GenerationSettings,
+  generation: ResolvedGeneration,
   action: string,
 ): Promise<string> {
   const apiKey = process.env.GOOGLE_API_KEY;
@@ -161,7 +166,10 @@ async function callGoogle(
     generationConfig: {
       maxOutputTokens: generation.maxTokens,
       temperature: generation.temperature ?? 0.7,
-      thinkingConfig: { thinkingLevel: 'low' },
+      // Verdict actions need one word; no thought tokens inside the output cap.
+      thinkingConfig: VERDICT_ACTIONS.has(action)
+        ? { thinkingBudget: 0 }
+        : { thinkingLevel: 'low' },
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -222,7 +230,7 @@ async function callDeepSeek(
   model: string,
   prompt: string,
   signal: AbortSignal,
-  generation: GenerationSettings,
+  generation: ResolvedGeneration,
 ): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -259,7 +267,7 @@ async function callXAI(
   model: string,
   prompt: string,
   signal: AbortSignal,
-  generation: GenerationSettings,
+  generation: ResolvedGeneration,
 ): Promise<string> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
@@ -334,7 +342,10 @@ export async function callAIProvider(
   const INITIAL_DELAY_MS = 2000;
   const REQUEST_TIMEOUT_MS = 30_000;
   const startedAt = Date.now();
-  const generation = context?.generation ?? DEFAULT_GENERATION;
+  const generation: ResolvedGeneration = {
+    ...(context?.generation ?? DEFAULT_GENERATION),
+    maxTokens: resolveMaxTokens(action, context?.generation),
+  };
   let attempts = 0;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

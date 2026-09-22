@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react';
 import type { TranslationKey, TranslationParams } from '@/lib/i18n';
 import {
   GameState, GameConfig, GamePhase, AI_MODELS, VariantRules,
-  DEFAULT_GENERATION, DISCUSSION_ROUNDS, SeatConfig
+  DEFAULT_GENERATION, DISCUSSION_ROUNDS, SeatConfig, GenerationSettings
 } from './types';
 import {
   createGame, proposeTeam, submitVote, submitQuestAction,
@@ -512,7 +512,7 @@ export const useGameStore = create<GameStore>()(
         return localStorage;
       }),
       // Persist durable game data without serializing store actions.
-      version: 4,
+      version: 5,
       partialize: (state) => ({
         config: state.config,
         gameState: state.gameState,
@@ -541,6 +541,23 @@ export const useGameStore = create<GameStore>()(
               }
             : state.gameState;
           state = { ...state, config, gameState };
+        }
+        if (version < 5) {
+          // 300 was the old fixed default; it now means "per-action default".
+          const stripDefault = (generation?: GenerationSettings) => (
+            generation?.maxTokens === 300
+              ? { ...generation, maxTokens: undefined }
+              : generation
+          );
+          state = {
+            ...state,
+            config: state.config
+              ? { ...state.config, generation: stripDefault(state.config.generation) ?? DEFAULT_GENERATION }
+              : state.config,
+            gameState: state.gameState
+              ? { ...state.gameState, generation: stripDefault(state.gameState.generation) ?? DEFAULT_GENERATION }
+              : state.gameState,
+          };
         }
         return state;
       },

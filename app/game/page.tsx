@@ -157,7 +157,7 @@ export default function GamePage() {
                     <dt>{t('game.settingsTemperature')}</dt>
                     <dd>{gameState.generation.temperature ?? t('lobby.providerDefault')}</dd>
                     <dt>{t('game.settingsMaxTokens')}</dt>
-                    <dd>{gameState.generation.maxTokens}</dd>
+                    <dd>{gameState.generation.maxTokens ?? t('lobby.maxTokensDefault')}</dd>
                     <dt>{t('game.settingsDiscussionRounds')}</dt>
                     <dd>{gameState.discussionRounds ?? DISCUSSION_ROUNDS}</dd>
                   </dl>

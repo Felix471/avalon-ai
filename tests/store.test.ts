@@ -161,7 +161,7 @@ describe('game store phase progress persistence', () => {
     expect(migrated.config).toMatchObject({
       promptMode: 'full',
       quickMode: false,
-      generation: { maxTokens: 300 },
+      generation: {},
     });
   });
 

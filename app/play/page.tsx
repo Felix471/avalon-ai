@@ -210,7 +210,7 @@ function LobbyContent() {
                       checked={config.generation.temperature === undefined}
                       onChange={event => updateConfig({
                         generation: event.target.checked
-                          ? { maxTokens: config.generation.maxTokens }
+                          ? { ...config.generation, temperature: undefined }
                           : { ...config.generation, temperature: 0.7 },
                       })}
                       className="accent-amber-500"
@@ -226,18 +226,22 @@ function LobbyContent() {
                     min={GENERATION_LIMITS.maxTokens.min}
                     max={GENERATION_LIMITS.maxTokens.max}
                     data-testid="max-tokens"
-                    value={config.generation.maxTokens}
+                    placeholder={t('lobby.maxTokensDefault')}
+                    value={config.generation.maxTokens ?? ''}
                     onChange={event => updateConfig({
                       generation: {
                         ...config.generation,
-                        maxTokens: Math.min(
-                          GENERATION_LIMITS.maxTokens.max,
-                          Math.max(GENERATION_LIMITS.maxTokens.min, Number(event.target.value)),
-                        ),
+                        maxTokens: event.target.value === ''
+                          ? undefined
+                          : Math.min(
+                              GENERATION_LIMITS.maxTokens.max,
+                              Math.max(GENERATION_LIMITS.maxTokens.min, Number(event.target.value)),
+                            ),
                       },
                     })}
                     className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-white outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30"
                   />
+                  <span className="block text-xs text-slate-500">{t('lobby.maxTokensHint')}</span>
                 </label>
 
                 <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">

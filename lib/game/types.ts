@@ -199,10 +199,22 @@ export interface SeatConfig {
 
 export interface GenerationSettings {
   temperature?: number;
-  maxTokens: number;
+  /** Explicit output cap for every action. Undefined = per-action default (DEFAULT_MAX_TOKENS). */
+  maxTokens?: number;
 }
 
-export const DEFAULT_GENERATION: GenerationSettings = { maxTokens: 300 };
+export const DEFAULT_GENERATION: GenerationSettings = {};
+
+/** Per-action output caps used when the player has not set maxTokens. */
+export const DEFAULT_MAX_TOKENS = { discussion: 600, other: 300 } as const;
+
+/** Actions whose whole answer is one verdict word or a few ids. */
+export const VERDICT_ACTIONS = new Set(['voting', 'quest', 'assassination']);
+
+export function resolveMaxTokens(action: string, generation?: GenerationSettings): number {
+  if (generation?.maxTokens !== undefined) return generation.maxTokens;
+  return action === 'discussion' ? DEFAULT_MAX_TOKENS.discussion : DEFAULT_MAX_TOKENS.other;
+}
 
 export const GENERATION_LIMITS = {
   temperature: { min: 0, max: 1.5, step: 0.1 },

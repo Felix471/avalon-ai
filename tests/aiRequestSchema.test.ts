@@ -111,6 +111,10 @@ describe('parseAIRequest', () => {
     }, 'generation.maxTokens');
   });
 
+  it('accepts generation without maxTokens (per-action default)', () => {
+    expect(parseAIRequest({ ...makeRequest(), generation: { temperature: 0.5 } }).ok).toBe(true);
+  });
+
   it.each([100, 1500])('accepts generation maxTokens boundary %s', (maxTokens) => {
     expect(parseAIRequest({
       ...makeRequest(),

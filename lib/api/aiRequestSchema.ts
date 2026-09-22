@@ -117,7 +117,7 @@ export const aiRequestSchema = z.strictObject({
   promptMode: z.enum(['full', 'naive']).optional(),
   generation: z.strictObject({
     temperature: z.number().min(0).max(1.5).optional(),
-    maxTokens: z.number().int().min(100).max(1500),
+    maxTokens: z.number().int().min(100).max(1500).optional(),
   }).optional(),
   gameState: gameStateSchema,
 }).superRefine((request, context) => {

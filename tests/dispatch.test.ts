@@ -271,6 +271,58 @@ describe('callAIProvider', () => {
     });
   });
 
+  describe('per-action output caps and Google thinking config', () => {
+    function googleBody(fetchMock: ReturnType<typeof vi.fn>) {
+      return JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    }
+
+    it.each(['voting', 'quest', 'assassination'])('Google %s: thinkingBudget 0 and 300 tokens', async (action: string) => {
+      const fetchMock = vi.fn().mockResolvedValue(response({ candidates: [{ content: { parts: [{ text: 'APPROVE' }] } }] }));
+      vi.stubGlobal('fetch', fetchMock);
+      await callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', action);
+      const body = googleBody(fetchMock);
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+      expect(body.generationConfig.maxOutputTokens).toBe(300);
+    });
+
+    it.each(['discussion', 'team_building'])('Google %s: thinkingLevel low', async (action: string) => {
+      const fetchMock = vi.fn().mockResolvedValue(response({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }));
+      vi.stubGlobal('fetch', fetchMock);
+      await callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', action);
+      const body = googleBody(fetchMock);
+      expect(body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'low' });
+      expect(body.generationConfig.maxOutputTokens).toBe(action === 'discussion' ? 600 : 300);
+    });
+
+    it('defaults to 600 tokens for discussion and 300 for verdicts on every provider', async () => {
+      const cases: Array<[string, string, (body: Record<string, unknown>) => number]> = [
+        ['anthropic', 'claude-sonnet-5', body => body.max_tokens as number],
+        ['openai', 'gpt-5.4-mini', body => body.max_completion_tokens as number],
+        ['deepseek', 'deepseek-flash', body => body.max_tokens as number],
+        ['xai', 'grok-4.3', body => body.max_tokens as number],
+      ];
+      for (const [provider, name, read] of cases) {
+        for (const [action, expected] of [['discussion', 600], ['voting', 300], ['quest', 300]] as const) {
+          const fetchMock = vi.fn().mockResolvedValue(provider === 'anthropic'
+            ? response({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' })
+            : openAIResponse('ok'));
+          vi.stubGlobal('fetch', fetchMock);
+          await callAIProvider(model(provider, name), 'prompt', action);
+          expect(read(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)))).toBe(expected);
+        }
+      }
+    });
+
+    it('an explicit maxTokens overrides the per-action default for every action', async () => {
+      for (const action of ['discussion', 'voting']) {
+        const fetchMock = vi.fn().mockResolvedValue(openAIResponse('ok'));
+        vi.stubGlobal('fetch', fetchMock);
+        await callAIProvider(model(), 'prompt', action, { generation: { maxTokens: 450 } });
+        expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).max_completion_tokens).toBe(450);
+      }
+    });
+  });
+
   it('parses the Google response shape', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
       candidates: [{ content: { parts: [{ text: 'hi' }] } }],
@@ -315,7 +367,7 @@ describe('callAIProvider', () => {
     expect(bodies[2]).toMatchObject({
       generationConfig: { thinkingConfig: { thinkingLevel: 'low' } },
     });
-    expect(bodies[3]).toMatchObject({ max_completion_tokens: 300 });
+    expect(bodies[3]).toMatchObject({ max_completion_tokens: 600 });
     expect(bodies[3]).not.toHaveProperty('max_tokens');
   });
 
