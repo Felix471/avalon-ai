@@ -26,6 +26,22 @@ export interface PhaseProgress {
   };
 }
 
+export type SeatStatus =
+  | { state: 'idle' }
+  | { state: 'thinking'; startedAt: number; provider?: string; modelName?: string }
+  | {
+      state: 'error';
+      message: string;
+      title: string;
+      provider?: string;
+      modelName?: string;
+      latencyMs?: number;
+      retryAfterUntil?: number;
+      kind: 'provider' | 'unparseable' | 'rate_limited' | 'network';
+    }
+  | { state: 'skipped'; modelName?: string }
+  | { state: 'done'; latencyMs?: number; provider?: string; modelName?: string };
+
 export function getPhaseKey(gameState: GameState | null): string {
   return gameState
     ? `${gameState.phase}:${gameState.currentQuest}:${gameState.consecutiveRejects}`
@@ -61,6 +77,14 @@ interface GameStore {
   appendDiscussionSpeech: (step: number, playerId: number, content: string) => void;
   setTeamBuildingProgress: (updates: Partial<PhaseProgress['teamBuilding']>) => void;
   setAssassinationProgress: (updates: Partial<PhaseProgress['assassination']>) => void;
+
+  seatStatus: Record<number, SeatStatus>;
+  providerFailureCounts: Record<string, number>;
+  dismissedProviderBanner: string | null;
+  setSeatStatus: (playerId: number, status: SeatStatus) => void;
+  clearSeatStatus: (playerId: number) => void;
+  resetSeatStatuses: () => void;
+  dismissProviderBanner: (provider: string) => void;
 
   // 游戏操作
   startGame: () => void;
@@ -179,6 +203,9 @@ export const useGameStore = create<GameStore>()(
       pendingAIPlayers: [],
       pendingVotes: {},
       pendingQuestActions: {},
+      seatStatus: {},
+      providerFailureCounts: {},
+      dismissedProviderBanner: null,
 
       getPhaseKey: () => getPhaseKey(get().gameState),
 
@@ -245,6 +272,28 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      setSeatStatus: (playerId, status) => set(state => {
+        const providerFailureCounts = { ...state.providerFailureCounts };
+        if (status.state === 'error' && status.kind !== 'rate_limited' && status.provider) {
+          providerFailureCounts[status.provider] = (providerFailureCounts[status.provider] ?? 0) + 1;
+        }
+
+        return {
+          seatStatus: { ...state.seatStatus, [playerId]: status },
+          providerFailureCounts,
+        };
+      }),
+
+      clearSeatStatus: (playerId) => set(state => {
+        const seatStatus = { ...state.seatStatus };
+        delete seatStatus[playerId];
+        return { seatStatus };
+      }),
+
+      resetSeatStatuses: () => set({ seatStatus: {} }),
+
+      dismissProviderBanner: (provider) => set({ dismissedProviderBanner: provider }),
+
       updateConfig: (updates) => set(state => {
         const playerCount = updates.playerCount ?? state.config.playerCount;
         const seats = resizeSeats(updates.seats ?? state.config.seats, playerCount);
@@ -292,6 +341,9 @@ export const useGameStore = create<GameStore>()(
           phaseProgress: createPhaseProgress(gameState),
           pendingVotes: {},
           pendingQuestActions: {},
+          seatStatus: {},
+          providerFailureCounts: {},
+          dismissedProviderBanner: null,
         });
       },
 
@@ -303,6 +355,9 @@ export const useGameStore = create<GameStore>()(
         pendingAIPlayers: [],
         pendingVotes: {},
         pendingQuestActions: {},
+        seatStatus: {},
+        providerFailureCounts: {},
+        dismissedProviderBanner: null,
       }),
 
       // 彻底清除存档并重置所有状态
@@ -319,6 +374,9 @@ export const useGameStore = create<GameStore>()(
           pendingAIPlayers: [],
           pendingVotes: {},
           pendingQuestActions: {},
+          seatStatus: {},
+          providerFailureCounts: {},
+          dismissedProviderBanner: null,
         });
       },
 

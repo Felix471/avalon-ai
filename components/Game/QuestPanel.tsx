@@ -5,15 +5,13 @@ import { useGameStore } from '@/lib/game/store';
 import { isPlayerOnCurrentTeam, hasPlayerActed, getQuestTeamMembers } from '@/lib/game/engine';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Bot, Check, CheckCircle, Loader2, Swords, User, XCircle } from 'lucide-react';
-import AISeatError from './AISeatError';
-import { describeAIError, readAIResponse } from './aiResponse';
+import { AlertTriangle, Bot, Check, CheckCircle, Swords, User, XCircle } from 'lucide-react';
+import AISeatStatus from './AISeatStatus';
+import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { chipClass, panelClass, panelHeadingClass } from './ui';
 
 export default function QuestPanel() {
-  const { gameState, questAction, addSystemEvent } = useGameStore();
-  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
-  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
+  const { gameState, questAction, addSystemEvent, seatStatus, setSeatStatus } = useGameStore();
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
 
@@ -30,20 +28,24 @@ export default function QuestPanel() {
     if (!gameState) return false;
 
     setIsProcessingAI(true);
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[playerId];
-      return next;
+    const member = gameState.players.find(player => player.id === playerId);
+    const provider = member?.aiModel?.provider;
+    const modelName = member?.aiModel?.name;
+    setSeatStatus(playerId, {
+      state: 'thinking',
+      startedAt: Date.now(),
+      provider,
+      modelName,
     });
 
     try {
-      const member = gameState.players.find(player => player.id === playerId);
       if (!member?.role) {
         throw new Error(`Quest player ${playerId} does not have a valid role`);
       }
 
       const isEvil = ROLES[member.role].team === 'evil';
       let success = true;
+      let latencyMs: number | undefined;
 
       if (isEvil) {
         const response = await fetch('/api/ai', {
@@ -59,6 +61,7 @@ export default function QuestPanel() {
         });
 
         const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+        latencyMs = readLatency(response);
 
         const data = await readAIResponse(response);
         if (typeof data.success !== 'boolean') {
@@ -73,11 +76,22 @@ export default function QuestPanel() {
         await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
       }
       questAction(playerId, success);
+      setSeatStatus(playerId, { state: 'done', latencyMs, provider, modelName });
       return true;
     } catch (error) {
       const described = describeAIError(error);
-      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
-      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      setSeatStatus(playerId, {
+        state: 'error',
+        message: described.message,
+        title: described.title,
+        kind: described.kind,
+        provider: described.provider ?? provider,
+        modelName: described.model ?? modelName,
+        latencyMs: described.latencyMs,
+        retryAfterUntil: described.retryAfterSeconds === undefined
+          ? undefined
+          : Date.now() + described.retryAfterSeconds * 1000,
+      });
       return false;
     } finally {
       setIsProcessingAI(false);
@@ -92,7 +106,7 @@ export default function QuestPanel() {
       for (const member of teamMembers) {
         if (member.isHuman) continue;
         if (hasPlayerActed(gameState, member.id)) continue;
-        if (seatErrors[member.id]) break;
+        if (seatStatus[member.id]?.state === 'error') break;
 
         const succeeded = await requestAIQuestAction(member.id);
         if (!succeeded) break;
@@ -118,11 +132,7 @@ export default function QuestPanel() {
   const handleSkipAIQuestAction = (playerId: number) => {
     const player = teamMembers.find(candidate => candidate.id === playerId);
     const modelName = player?.aiModel?.name || 'AI';
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[playerId];
-      return next;
-    });
+    setSeatStatus(playerId, { state: 'skipped', modelName });
     questAction(playerId, true);
     addSystemEvent(`玩家${playerId}（${modelName}）任务行动已跳过，按成功计`);
     setRetryVersion(version => version + 1);
@@ -229,21 +239,18 @@ export default function QuestPanel() {
         </div>
       )}
 
-      {Object.keys(seatErrors).map(playerIdText => {
-        const playerId = Number(playerIdText);
-        const player = teamMembers.find(candidate => candidate.id === playerId);
-        return (
-          <div key={playerId} title={seatErrorTitles[playerId]}>
-            <AISeatError
-              playerId={playerId}
-              modelName={player?.aiModel?.name}
-              message={seatErrors[playerId]}
-              onRetry={() => void handleRetryAIQuestAction(playerId)}
-              onSkip={() => handleSkipAIQuestAction(playerId)}
-            />
-          </div>
-        );
-      })}
+      {teamMembers.filter(player => {
+        const state = seatStatus[player.id]?.state;
+        return !player.isHuman && (state === 'thinking' || state === 'error');
+      }).map(player => (
+        <AISeatStatus
+          key={player.id}
+          playerId={player.id}
+          onRetry={() => void handleRetryAIQuestAction(player.id)}
+          onSkip={() => handleSkipAIQuestAction(player.id)}
+          skipHint="任务按成功计"
+        />
+      ))}
 
       {/* 进度 */}
       <div className="space-y-2">
@@ -268,7 +275,6 @@ export default function QuestPanel() {
 
       {actedCount > 0 && actedCount < teamMembers.length && (
         <div className="text-center text-slate-400 text-sm">
-          <Loader2 aria-hidden="true" className="mr-2 inline size-4 animate-spin" />
           等待其他队员行动...
         </div>
       )}

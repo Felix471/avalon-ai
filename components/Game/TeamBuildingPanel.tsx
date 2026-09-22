@@ -5,10 +5,10 @@ import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { getCurrentLeader, isForcedTeamBuilding } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertTriangle, Bot, Crown, Loader2, Target, User } from 'lucide-react';
-import AISeatError from './AISeatError';
-import { describeAIError, readAIResponse } from './aiResponse';
-import { panelClass, panelHeadingClass } from './ui';
+import { AlertTriangle, Bot, Crown, Target, User } from 'lucide-react';
+import AISeatStatus from './AISeatStatus';
+import { describeAIError, readAIResponse, readLatency } from './aiResponse';
+import { panelHeadingClass } from './ui';
 
 export default function TeamBuildingPanel() {
   const {
@@ -18,10 +18,10 @@ export default function TeamBuildingPanel() {
     setTeamBuildingProgress,
     proposeTeam,
     addSystemEvent,
+    seatStatus,
+    setSeatStatus,
   } = useGameStore();
   const [isAISelecting, setIsAISelecting] = useState(false);
-  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
-  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -38,18 +38,20 @@ export default function TeamBuildingPanel() {
 
   useEffect(() => {
     ensurePhaseProgress();
-    setSeatErrors({});
-    setSeatErrorTitles({});
   }, [phaseKey, ensurePhaseProgress]);
 
   const requestAITeam = async (playerId: number) => {
     if (!gameState) return;
 
     setIsAISelecting(true);
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[playerId];
-      return next;
+    const player = players.find(candidate => candidate.id === playerId);
+    const provider = player?.aiModel?.provider;
+    const modelName = player?.aiModel?.name;
+    setSeatStatus(playerId, {
+      state: 'thinking',
+      startedAt: Date.now(),
+      provider,
+      modelName,
     });
     try {
       const response = await fetch('/api/ai', {
@@ -64,6 +66,7 @@ export default function TeamBuildingPanel() {
         }),
       });
       const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+      const latencyMs = readLatency(response);
       const data = await readAIResponse(response);
       const validPlayerIds = new Set(players.map(player => player.id));
       const team = data.team;
@@ -80,11 +83,22 @@ export default function TeamBuildingPanel() {
       if (!isMockResponse) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      setSeatStatus(playerId, { state: 'done', latencyMs, provider, modelName });
       proposeTeam(team);
     } catch (error) {
       const described = describeAIError(error);
-      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
-      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      setSeatStatus(playerId, {
+        state: 'error',
+        message: described.message,
+        title: described.title,
+        kind: described.kind,
+        provider: described.provider ?? provider,
+        modelName: described.model ?? modelName,
+        latencyMs: described.latencyMs,
+        retryAfterUntil: described.retryAfterSeconds === undefined
+          ? undefined
+          : Date.now() + described.retryAfterSeconds * 1000,
+      });
     } finally {
       setIsAISelecting(false);
     }
@@ -92,7 +106,7 @@ export default function TeamBuildingPanel() {
 
   // AI队长自动选队
   useEffect(() => {
-    if (!gameState || !leader || !progressIsCurrent || isHumanLeader || humanOverride || isAISelecting || seatErrors[leader.id]) return;
+    if (!gameState || !leader || !progressIsCurrent || isHumanLeader || humanOverride || isAISelecting || seatStatus[leader.id]?.state === 'error') return;
 
     requestAITeam(leader.id);
   }, [isHumanLeader, leader?.id, progressIsCurrent]);
@@ -118,7 +132,7 @@ export default function TeamBuildingPanel() {
   const handleSkipAITeam = () => {
     if (!leader) return;
     const modelName = leader.aiModel?.name || 'AI';
-    setSeatErrors({});
+    setSeatStatus(leader.id, { state: 'skipped', modelName });
     setTeamBuildingProgress({ humanOverride: true });
     addSystemEvent(`队长 玩家${leader.id}（${modelName}）不可用，由你代为组队`);
   };
@@ -142,28 +156,13 @@ export default function TeamBuildingPanel() {
           </div>
         )}
 
-        {seatErrors[leader.id] ? (
-          <div title={seatErrorTitles[leader.id]}>
-            <AISeatError
-              playerId={leader.id}
-              modelName={leader.aiModel?.name}
-              message={seatErrors[leader.id]}
-              onRetry={() => void requestAITeam(leader.id)}
-              onSkip={handleSkipAITeam}
-              skipLabel="由你组队"
-            />
-          </div>
-        ) : (
-          <div className={panelClass}>
-            <div className="flex items-center gap-3">
-              <Loader2 aria-hidden="true" className="size-5 animate-spin text-amber-400" />
-              <div>
-                <p className="text-white font-medium">玩家{leader.id} 正在选择队伍...</p>
-                <p className="text-slate-400 text-sm">{leader.aiModel?.name || 'AI'}</p>
-              </div>
-            </div>
-          </div>
-        )}
+        <AISeatStatus
+          playerId={leader.id}
+          onRetry={() => void requestAITeam(leader.id)}
+          onSkip={handleSkipAITeam}
+          skipLabel="由你组队"
+          skipHint="由你组队"
+        />
 
         <div className="text-slate-400 text-sm text-center">
           需要选择 {requiredSize} 人执行任务

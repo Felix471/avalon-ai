@@ -59,7 +59,43 @@ describe('game store phase progress persistence', () => {
 
     expect(persisted).toHaveProperty('phaseProgress');
     expect(persisted).toHaveProperty('pendingVotes');
+    expect(persisted).not.toHaveProperty('seatStatus');
     expect(Object.values(persisted)).not.toContainEqual(expect.any(Function));
+  });
+
+  it('counts provider failures except rate limits', () => {
+    const { setSeatStatus } = useGameStore.getState();
+
+    setSeatStatus(2, {
+      state: 'error',
+      message: 'AI 暂时不可用',
+      title: 'provider failure',
+      provider: 'openai',
+      kind: 'provider',
+    });
+    setSeatStatus(3, {
+      state: 'error',
+      message: '请求过于频繁，请 12 秒后重试',
+      title: 'rate limited',
+      provider: 'openai',
+      kind: 'rate_limited',
+    });
+
+    expect(useGameStore.getState().providerFailureCounts).toEqual({ openai: 1 });
+  });
+
+  it('resets transient seat statuses', () => {
+    const store = useGameStore.getState();
+    store.setSeatStatus(2, {
+      state: 'error',
+      message: 'AI 暂时不可用',
+      title: 'provider failure',
+      provider: 'google',
+      kind: 'provider',
+    });
+    useGameStore.getState().resetSeatStatuses();
+
+    expect(useGameStore.getState().seatStatus).toEqual({});
   });
 
   it('migrates version 1 state with fresh progress and votes', async () => {

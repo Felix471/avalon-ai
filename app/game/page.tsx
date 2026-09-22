@@ -29,12 +29,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ScrollText, Settings, Swords } from 'lucide-react';
+import { AlertTriangle, ScrollText, Settings, Swords, X } from 'lucide-react';
 
 export default function GamePage() {
   const router = useRouter();
   const hydrated = useHydration();
-  const { gameState } = useGameStore();
+  const {
+    gameState,
+    providerFailureCounts,
+    dismissedProviderBanner,
+    dismissProviderBanner,
+  } = useGameStore();
 
   useEffect(() => {
     if (hydrated && !gameState) {
@@ -60,6 +65,12 @@ export default function GamePage() {
 
   // 判断当前阶段是否需要玩家输入
   const isInteractivePhase = ['discussion', 'team_building', 'team_vote', 'quest', 'assassination'].includes(gameState.phase);
+  const unavailableProvider = Object.entries(providerFailureCounts)
+    .find(([provider, failures]) => failures >= 3 && dismissedProviderBanner !== provider)?.[0];
+  const providerLabel = unavailableProvider
+    ? gameState.players.find(player => player.aiModel?.provider === unavailableProvider)?.aiModel?.name
+      ?? unavailableProvider
+    : null;
 
   const renderPhasePanel = () => {
     switch (gameState.phase) {
@@ -157,6 +168,26 @@ export default function GamePage() {
             <ExitGameButton />
           </div>
         </div>
+
+        {unavailableProvider && providerLabel && (
+          <div
+            data-testid="provider-banner"
+            className="mb-4 flex items-center gap-3 rounded-lg border border-rose-800 bg-rose-950/50 px-4 py-3 text-sm text-rose-200"
+          >
+            <AlertTriangle aria-hidden="true" className="size-4 shrink-0 text-rose-400" />
+            <span className="flex-1">
+              {providerLabel} 本局多次不可用，可在下一局的设置中换用其他模型
+            </span>
+            <button
+              type="button"
+              onClick={() => dismissProviderBanner(unavailableProvider)}
+              aria-label="关闭模型不可用提示"
+              className="rounded p-1 text-rose-300 hover:bg-rose-900/60 hover:text-white"
+            >
+              <X aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+        )}
 
         {/* 三栏布局 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
-import { Bot, Loader2, Swords, Target, User } from 'lucide-react';
-import AISeatError from './AISeatError';
-import { describeAIError, readAIResponse } from './aiResponse';
+import { Bot, Swords, Target, User } from 'lucide-react';
+import AISeatStatus from './AISeatStatus';
+import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { panelHeadingClass } from './ui';
 
 export default function AssassinationPanel() {
@@ -17,11 +17,11 @@ export default function AssassinationPanel() {
     setAssassinationProgress,
     assassinate,
     addSystemEvent,
+    seatStatus,
+    setSeatStatus,
   } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const [isAIAssassinating, setIsAIAssassinating] = useState(false);
-  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
-  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -34,18 +34,20 @@ export default function AssassinationPanel() {
 
   useEffect(() => {
     ensurePhaseProgress();
-    setSeatErrors({});
-    setSeatErrorTitles({});
   }, [phaseKey, ensurePhaseProgress]);
 
   const requestAITarget = async (playerId: number) => {
     if (!gameState) return;
 
     setIsAIAssassinating(true);
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[playerId];
-      return next;
+    const player = players.find(candidate => candidate.id === playerId);
+    const provider = player?.aiModel?.provider;
+    const modelName = player?.aiModel?.name;
+    setSeatStatus(playerId, {
+      state: 'thinking',
+      startedAt: Date.now(),
+      provider,
+      modelName,
     });
 
     try {
@@ -62,6 +64,7 @@ export default function AssassinationPanel() {
       });
 
       const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+      const latencyMs = readLatency(response);
 
       const data = await readAIResponse(response);
       if (
@@ -75,11 +78,22 @@ export default function AssassinationPanel() {
       if (!isMockResponse) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
+      setSeatStatus(playerId, { state: 'done', latencyMs, provider, modelName });
       assassinate(data.targetId);
     } catch (error) {
       const described = describeAIError(error);
-      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
-      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      setSeatStatus(playerId, {
+        state: 'error',
+        message: described.message,
+        title: described.title,
+        kind: described.kind,
+        provider: described.provider ?? provider,
+        modelName: described.model ?? modelName,
+        latencyMs: described.latencyMs,
+        retryAfterUntil: described.retryAfterSeconds === undefined
+          ? undefined
+          : Date.now() + described.retryAfterSeconds * 1000,
+      });
     } finally {
       setIsAIAssassinating(false);
     }
@@ -87,7 +101,7 @@ export default function AssassinationPanel() {
 
   // AI刺客选择
   useEffect(() => {
-    if (!gameState || !assassin || !progressIsCurrent || isHumanAssassin || humanOverride || seatErrors[assassin.id]) return;
+    if (!gameState || !assassin || !progressIsCurrent || isHumanAssassin || humanOverride || seatStatus[assassin.id]?.state === 'error') return;
 
     const timer = setTimeout(() => requestAITarget(assassin.id), 1500);
     return () => clearTimeout(timer);
@@ -104,7 +118,7 @@ export default function AssassinationPanel() {
   const handleSkipAITarget = () => {
     if (!assassin) return;
     const modelName = assassin.aiModel?.name || 'AI';
-    setSeatErrors({});
+    setSeatStatus(assassin.id, { state: 'skipped', modelName });
     setAssassinationProgress({ humanOverride: true });
     addSystemEvent(`刺客（${modelName}）不可用，由你代为选择刺杀目标`);
   };
@@ -124,21 +138,15 @@ export default function AssassinationPanel() {
           <p className="text-slate-300 mt-2">
             但刺客 <span className="text-rose-400">{assassin.name}</span> 有最后一次机会...
           </p>
-          {seatErrors[assassin.id] ? (
-            <div className="mt-4 text-left" title={seatErrorTitles[assassin.id]}>
-              <AISeatError
+          {(isAIAssassinating || seatStatus[assassin.id]?.state === 'error') && (
+            <div className="mt-4 text-left">
+              <AISeatStatus
                 playerId={assassin.id}
-                modelName={assassin.aiModel?.name}
-                message={seatErrors[assassin.id]}
                 onRetry={() => void requestAITarget(assassin.id)}
                 onSkip={handleSkipAITarget}
                 skipLabel="由你选择"
+                skipHint="由你选择目标"
               />
-            </div>
-          ) : isAIAssassinating && (
-            <div className="mt-4">
-              <Loader2 aria-hidden="true" className="mx-auto mb-2 size-5 animate-spin text-rose-400" />
-              <p className="text-slate-400">正在选择刺杀目标...</p>
             </div>
           )}
         </div>

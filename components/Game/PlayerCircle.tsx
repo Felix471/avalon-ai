@@ -3,6 +3,7 @@
 import { useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import {
+  AlertTriangle,
   Bot,
   Crown,
   Drama,
@@ -17,7 +18,7 @@ import { RoleIcon } from './roleIcon';
 import { evilColor, goodColor } from './ui';
 
 export default function PlayerCircle() {
-  const { gameState } = useGameStore();
+  const { gameState, seatStatus } = useGameStore();
 
   if (!gameState) return null;
 
@@ -67,6 +68,7 @@ export default function PlayerCircle() {
         const isHuman = player.id === humanPlayerId;
         const isOnTeam = currentProposedTeam?.includes(player.id);
         const role = player.role ? ROLES[player.role] : null;
+        const playerSeatStatus = seatStatus[player.id];
 
         return (
           <div
@@ -82,11 +84,18 @@ export default function PlayerCircle() {
                 : 'bg-slate-700/50 border border-slate-600'
               }
               ${isOnTeam ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900' : ''}
+              ${playerSeatStatus?.state === 'thinking' ? 'ring-2 ring-amber-300/40 animate-pulse' : ''}
             `}>
               {/* 队长标记 */}
               {isLeader && (
                 <div className="absolute -top-2 -right-2 bg-yellow-500 rounded-full p-1">
                   <Crown aria-hidden="true" className="size-3 text-yellow-900" />
+                </div>
+              )}
+
+              {playerSeatStatus?.state === 'error' && (
+                <div className="absolute -top-2 -left-2 rounded-full bg-rose-950 p-1">
+                  <AlertTriangle aria-hidden="true" className="size-3 text-rose-400" />
                 </div>
               )}
 

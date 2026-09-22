@@ -12,7 +12,6 @@ import {
   Check,
   Crown,
   Info,
-  Loader2,
   MessageCircle,
   Mic,
   Send,
@@ -23,8 +22,8 @@ import {
   quickSuspicionCheck,
   MAX_SPEECH_LENGTH
 } from '@/lib/security/inputValidator';
-import AISeatError from './AISeatError';
-import { describeAIError, readAIResponse } from './aiResponse';
+import AISeatStatus from './AISeatStatus';
+import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { panelClass, panelHeadingClass } from './ui';
 
 // ==================== 安全输入组件（内联） ====================
@@ -162,10 +161,10 @@ export default function DiscussionPanel() {
     addSystemEvent,
     nextDiscussionRound,
     goToTeamBuilding,
+    setSeatStatus,
+    clearSeatStatus,
   } = useGameStore();
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
-  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
   const requestedStepRef = useRef<number | null>(null);
 
   // 重置状态（当进入新的发言阶段时）
@@ -176,8 +175,6 @@ export default function DiscussionPanel() {
 
   useEffect(() => {
     ensurePhaseProgress();
-    setSeatErrors({});
-    setSeatErrorTitles({});
     requestedStepRef.current = null;
   }, [phaseKey, ensurePhaseProgress]);
 
@@ -209,6 +206,7 @@ export default function DiscussionPanel() {
 
   const completeSpeakingStep = (stepIndex: number, playerId: number, content: string) => {
     appendDiscussionSpeech(stepIndex, playerId, content);
+    clearSeatStatus(playerId);
     if (stepIndex + 1 === players.length) {
       nextDiscussionRound();
     }
@@ -220,10 +218,14 @@ export default function DiscussionPanel() {
 
     requestedStepRef.current = stepIndex;
     setIsProcessingAI(true);
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[stepIndex];
-      return next;
+    const player = players.find(candidate => candidate.id === playerId);
+    const provider = player?.aiModel?.provider;
+    const modelName = player?.aiModel?.name;
+    setSeatStatus(playerId, {
+      state: 'thinking',
+      startedAt: Date.now(),
+      provider,
+      modelName,
     });
 
     try {
@@ -241,6 +243,7 @@ export default function DiscussionPanel() {
       });
 
       const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+      const latencyMs = readLatency(response);
 
       const data = await readAIResponse(response);
       if (typeof data.speech !== 'string') {
@@ -251,12 +254,23 @@ export default function DiscussionPanel() {
       if (!isMockResponse) {
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
       }
+      setSeatStatus(playerId, { state: 'done', latencyMs, provider, modelName });
       addDiscussion(playerId, speech);
       completeSpeakingStep(stepIndex, playerId, speech);
     } catch (error) {
       const described = describeAIError(error);
-      setSeatErrors(prev => ({ ...prev, [stepIndex]: described.message }));
-      setSeatErrorTitles(prev => ({ ...prev, [stepIndex]: described.title }));
+      setSeatStatus(playerId, {
+        state: 'error',
+        message: described.message,
+        title: described.title,
+        kind: described.kind,
+        provider: described.provider ?? provider,
+        modelName: described.model ?? modelName,
+        latencyMs: described.latencyMs,
+        retryAfterUntil: described.retryAfterSeconds === undefined
+          ? undefined
+          : Date.now() + described.retryAfterSeconds * 1000,
+      });
     } finally {
       setIsProcessingAI(false);
     }
@@ -304,11 +318,7 @@ export default function DiscussionPanel() {
   const handleSkipAISpeech = (playerId: number) => {
     const player = players.find(candidate => candidate.id === playerId);
     const modelName = player?.aiModel?.name || 'AI';
-    setSeatErrors(prev => {
-      const next = { ...prev };
-      delete next[currentSpeakerIndex];
-      return next;
-    });
+    setSeatStatus(playerId, { state: 'skipped', modelName });
     addDiscussion(playerId, '');
     addSystemEvent(`玩家${playerId}（${modelName}）的发言已跳过（AI 不可用）`);
     completeSpeakingStep(currentSpeakerIndex, playerId, '');
@@ -413,23 +423,15 @@ export default function DiscussionPanel() {
                 跳过发言（保持沉默）
               </Button>
             </div>
-          ) : currentSpeaker && seatErrors[currentSpeakerIndex] ? (
-            <div title={seatErrorTitles[currentSpeakerIndex]}>
-              <AISeatError
-                playerId={currentSpeaker.id}
-                modelName={currentSpeaker.aiModel?.name}
-                message={seatErrors[currentSpeakerIndex]}
-                onRetry={() => handleRetryAISpeech(currentSpeaker.id)}
-                onSkip={() => handleSkipAISpeech(currentSpeaker.id)}
-              />
-            </div>
+          ) : currentSpeaker ? (
+            <AISeatStatus
+              playerId={currentSpeaker.id}
+              onRetry={() => handleRetryAISpeech(currentSpeaker.id)}
+              onSkip={() => handleSkipAISpeech(currentSpeaker.id)}
+              skipHint="发言留空"
+            />
           ) : (
-            <div className="flex items-center gap-3 text-slate-400">
-              <Loader2 aria-hidden="true" className="size-5 animate-spin" />
-              <span>
-                玩家{currentSpeaker?.id} ({currentSpeaker?.aiModel?.name || 'AI'}) 正在发言...
-              </span>
-            </div>
+            null
           )}
         </div>
       )}
