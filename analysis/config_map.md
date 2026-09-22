@@ -35,3 +35,5 @@ rows 1–4 (Apr 17–18), rows 5–6 (Apr 19–20), row 7 (Apr 20 early), rows 8
   tokens at provider-default temperature for Anthropic/OpenAI/DeepSeek/xAI
   (`max_completion_tokens` for gpt-5*), but Gemini runs at temperature 0.7 with 4096 max tokens,
   an extra system instruction, and post-hoc truncation to 500 chars.
+
+The dataset was collected with the April-2026 model strings listed above; the web app (`lib/game/types.ts`) has since moved to newer strings and no longer reproduces the dataset's models.

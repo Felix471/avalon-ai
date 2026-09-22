@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "batch": "tsx scripts/batch.ts",
+    "smoke": "tsx scripts/smoke.ts",
     "metrics": "tsx scripts/metrics.ts"
   },
   "dependencies": {

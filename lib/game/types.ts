@@ -103,13 +103,14 @@ export interface AIModel {
   color: string;
 }
 
+// These are the model strings the web app calls today; the dataset in data/games.jsonl was collected with the April-2026 strings recorded in analysis/config_map.md.
 export const AI_MODELS: AIModel[] = [
   // Anthropic
   {
     id: 'claude-sonnet',
-    name: 'Claude Sonnet 4.6',
+    name: 'Claude Sonnet 5',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     color: '#D97706'
   },
 
@@ -125,27 +126,27 @@ export const AI_MODELS: AIModel[] = [
   // Google
   {
     id: 'gemini-flash',
-    name: 'Gemini 2.5 Flash',
+    name: 'Gemini 3.8 Flash',
     provider: 'google',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     color: '#4285F4'
   },
 
   // DeepSeek
   {
     id: 'deepseek',
-    name: 'DeepSeek',
+    name: 'DeepSeek V4.1 Flash',
     provider: 'deepseek',
-    model: 'deepseek-chat',
+    model: 'deepseek-flash',
     color: '#0066FF'
   },
 
   // xAI - Grok
   {
     id: 'grok',
-    name: 'Grok 4',
+    name: 'Grok 4.3 (non-reasoning)',
     provider: 'xai',
-    model: 'grok-4-fast-non-reasoning',
+    model: 'grok-4.3',
     color: '#1DA1F2'
   },
 ];

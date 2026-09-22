@@ -31,6 +31,7 @@ npm run batch -- --games=5 --configs=heterogeneous-full,homogeneous-gpt4o
 ### Available configs
 
 Exact model API strings (see `analysis/config_map.md` for paper labels and collection dates).
+Because `scripts/configs.ts` references models by `id`, running the batch today uses the current strings from `lib/game/types.ts`, not the ones in the table.
 Note: `homogeneous-gpt4o` is a historical label — it runs **gpt-5.4-mini**, not GPT-4o (model
 identifiers were updated in commit `ef8305b` without renaming config ids).
 

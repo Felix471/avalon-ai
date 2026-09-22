@@ -118,6 +118,7 @@ async function callGoogle(model: string, prompt: string, signal: AbortSignal): P
     generationConfig: {
       maxOutputTokens: 4096,
       temperature: 0.7,
+      thinkingConfig: { thinkingLevel: 'low' },
     },
     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -178,6 +179,7 @@ async function callDeepSeek(model: string, prompt: string, signal: AbortSignal):
     body: JSON.stringify({
       model,
       max_tokens: 300,
+      thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
     }),
     signal,
@@ -208,6 +210,7 @@ async function callXAI(model: string, prompt: string, signal: AbortSignal): Prom
     body: JSON.stringify({
       model,
       max_tokens: 300,
+      reasoning_effort: 'none',
       messages: [{ role: 'user', content: prompt }],
     }),
     signal,
