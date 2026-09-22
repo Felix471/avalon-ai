@@ -120,6 +120,35 @@ export function validateDiscussionOutput(output: string): OutputValidationResult
   };
 }
 
+// ==================== Verdict helpers ====================
+
+/** Returns whichever of `words` occurs last in `text` as a whole word, or null. */
+function lastWholeWord(text: string, words: string[]): string | null {
+  let best: { word: string; index: number } | null = null;
+  for (const word of words) {
+    const pattern = new RegExp(`\\b${word}\\b`, 'g');
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      if (!best || match.index > best.index) best = { word, index: match.index };
+    }
+  }
+  return best?.word ?? null;
+}
+
+/** Returns the vote of the pattern whose last match occurs latest in `text`, or null. */
+function lastMatch(text: string, candidates: Array<{ pattern: RegExp; vote: boolean }>): boolean | null {
+  let best: { vote: boolean; index: number } | null = null;
+  for (const candidate of candidates) {
+    candidate.pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = candidate.pattern.exec(text)) !== null) {
+      if (!best || match.index > best.index) best = { vote: candidate.vote, index: match.index };
+      if (match[0].length === 0) candidate.pattern.lastIndex++;
+    }
+  }
+  return best?.vote ?? null;
+}
+
 // ==================== 投票输出验证 ====================
 
 /**
@@ -133,25 +162,21 @@ export function validateVotingOutput(output: string): {
 } {
   const cleaned = output.trim().toUpperCase();
 
-  // 严格匹配
-  if (cleaned === 'APPROVE' || cleaned.includes('APPROVE')) {
-    return { isValid: true, vote: true, anomalyDetected: false };
-  }
+  // Whole-word verdicts. When both appear (a model reasoning aloud and then
+  // deciding), the last one wins.
+  const verdict = lastWholeWord(cleaned, ['APPROVE', 'REJECT']);
+  if (verdict === 'APPROVE') return { isValid: true, vote: true, anomalyDetected: false };
+  if (verdict === 'REJECT') return { isValid: true, vote: false, anomalyDetected: false };
 
-  if (cleaned === 'REJECT' || cleaned.includes('REJECT')) {
-    return { isValid: true, vote: false, anomalyDetected: false };
-  }
+  // Loose matches (flagged as anomalies). English words are whole words so that
+  // "cannot", "know", "another" never count as a "no".
+  const loose = lastMatch(cleaned, [
+    { pattern: /\b(YES|AGREE)\b|同意|赞成|通过/g, vote: true },
+    { pattern: /\bNO\b|\bDISAGREE\b|反对|否决|不同意/g, vote: false },
+  ]);
+  if (loose !== null) return { isValid: true, vote: loose, anomalyDetected: true };
 
-  // 宽松匹配（处理一些边缘情况）
-  if (/yes|agree|同意|赞成|通过/i.test(cleaned)) {
-    return { isValid: true, vote: true, anomalyDetected: true };
-  }
-
-  if (/no|disagree|反对|否决|不同意/i.test(cleaned)) {
-    return { isValid: true, vote: false, anomalyDetected: true };
-  }
-
-  // 无法解析，返回随机结果
+  // Unparseable: the caller must treat this as an error, never as a vote.
   return {
     isValid: false,
     vote: null,
@@ -176,14 +201,10 @@ export function validateQuestActionOutput(output: string, isEvil: boolean): {
     return { isValid: true, success: true, anomalyDetected: false };
   }
 
-  // 坏人可以选择
-  if (cleaned === 'SUCCESS' || cleaned.includes('SUCCESS')) {
-    return { isValid: true, success: true, anomalyDetected: false };
-  }
-
-  if (cleaned === 'FAIL' || cleaned.includes('FAIL')) {
-    return { isValid: true, success: false, anomalyDetected: false };
-  }
+  // 坏人可以选择 — last whole-word verdict wins.
+  const verdict = lastWholeWord(cleaned, ['SUCCESS', 'FAIL']);
+  if (verdict === 'SUCCESS') return { isValid: true, success: true, anomalyDetected: false };
+  if (verdict === 'FAIL') return { isValid: true, success: false, anomalyDetected: false };
 
   // 无法解析，默认成功（更安全的选择）
   return { isValid: false, success: true, anomalyDetected: true };

@@ -35,6 +35,13 @@ function markMockResponse(response: NextResponse) {
   return response;
 }
 
+// Set AI_DEBUG=1 to log the raw model text and the parsed verdict for every call.
+function debugRaw(action: string, model: AIModelRef, text: string, parsed?: unknown) {
+  if (process.env.AI_DEBUG !== '1') return;
+  const preview = text.replace(/\s+/g, ' ').slice(0, 200);
+  console.error(`[AI_RAW] ${action} ${model.provider}/${model.model}: ${JSON.stringify(preview)}${parsed === undefined ? '' : ` -> ${JSON.stringify(parsed)}`}`);
+}
+
 function providerFailureResponse(model: AIModelRef, result: Extract<AIProviderResult, { ok: false }>) {
   return NextResponse.json(
     {
@@ -181,6 +188,7 @@ async function handleDiscussion(
   const aiResponse = aiResult.text;
 
   const validation = validateDiscussionOutput(aiResponse);
+  debugRaw('discussion', player.aiModel!, aiResponse, { anomaly: validation.anomalyDetected });
 
   if (validation.anomalyDetected) {
     logSuspiciousActivity(playerId, 'discussion', prompt.substring(0, 200), aiResponse, validation.anomalyReason || 'Unknown');
@@ -216,6 +224,7 @@ async function handleVoting(
   const aiResponse = aiResult.text;
 
   const validation = validateVotingOutput(aiResponse);
+  debugRaw('voting', player.aiModel!, aiResponse, validation);
 
   if (validation.anomalyDetected) {
     logSuspiciousActivity(playerId, 'voting', prompt, aiResponse, 'Voting output anomaly');
@@ -251,6 +260,7 @@ async function handleQuestAction(
   const aiResponse = aiResult.text;
 
   const validation = validateQuestActionOutput(aiResponse, isEvil);
+  debugRaw('quest', player.aiModel!, aiResponse, validation);
 
   if (validation.anomalyDetected) {
     logSuspiciousActivity(playerId, 'quest', prompt, aiResponse, 'Quest action anomaly');

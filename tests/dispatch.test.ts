@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { callAIProvider } from '@/lib/ai/dispatch';
+import {
+  anthropicPlainText,
+  anthropicThinkingOnlyMaxTokens,
+  anthropicThinkingThenText,
+  googleThoughtPartThenText,
+  googleWithThoughtSignature,
+} from './fixtures/votingResponses';
 
 const originalEnv = { ...process.env };
 
@@ -198,10 +205,70 @@ describe('callAIProvider', () => {
   });
 
   it('parses the Anthropic response shape', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ content: [{ text: 'hi' }] })));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' })));
 
     await expect(callAIProvider(model('anthropic', 'claude-test'), 'prompt', 'discussion'))
       .resolves.toMatchObject({ ok: true, text: 'hi', attempts: 1 });
+  });
+
+  describe('captured voting responses (2026-09-22)', () => {
+    it('reads a plain Anthropic text block', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(anthropicPlainText)));
+      await expect(callAIProvider(model('anthropic', 'claude-sonnet-5'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: true, text: 'APPROVE' });
+    });
+
+    it('concatenates text blocks when a thinking block comes first', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(anthropicThinkingThenText)));
+      await expect(callAIProvider(model('anthropic', 'claude-sonnet-5'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: true, text: 'REJECT' });
+    });
+
+    it('reports the stop_reason and does not retry when Anthropic returns no text', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(response(anthropicThinkingOnlyMaxTokens));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(callAIProvider(model('anthropic', 'claude-sonnet-5'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: false, error: 'empty_response:max_tokens', attempts: 1 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends thinking disabled to Anthropic', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(response(anthropicPlainText));
+      vi.stubGlobal('fetch', fetchMock);
+      await callAIProvider(model('anthropic', 'claude-sonnet-5'), 'prompt', 'voting');
+      const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+      expect(body.thinking).toEqual({ type: 'disabled' });
+    });
+
+    it('reads a Google text part that carries a thoughtSignature', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(googleWithThoughtSignature)));
+      await expect(callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: true, text: 'APPROVE' });
+    });
+
+    it('ignores Google thought parts and leaves verdict text unscrubbed', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(googleThoughtPartThenText)));
+      await expect(callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: true, text: 'REJECT' });
+    });
+
+    it('still scrubs analysis lines from Google discussion text only', async () => {
+      const body = { candidates: [{ content: { parts: [{ text: '分析：先看队长。\n我暂时信任3号。' }] }, finishReason: 'STOP' }] };
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(body)));
+      await expect(callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', 'discussion'))
+        .resolves.toMatchObject({ ok: true, text: '我暂时信任3号。' });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(body)));
+      await expect(callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: true, text: '分析：先看队长。\n我暂时信任3号。' });
+    });
+
+    it('reports the Google finishReason when no text part is returned', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(response({ candidates: [{ content: { parts: [{ text: 'x', thought: true }] }, finishReason: 'MAX_TOKENS' }] }));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(callAIProvider(model('google', 'gemini-3.8-flash'), 'prompt', 'voting'))
+        .resolves.toMatchObject({ ok: false, error: 'empty_response:MAX_TOKENS', attempts: 1 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('parses the Google response shape', async () => {

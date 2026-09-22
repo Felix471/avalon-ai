@@ -59,6 +59,10 @@ async function callAnthropic(
     body: JSON.stringify({
       model,
       max_tokens: generation.maxTokens,
+      // Sonnet 5 runs adaptive thinking by default; a thinking block then precedes
+      // the text and can consume the whole max_tokens budget on short-answer prompts.
+      // The game only needs short direct replies, so thinking is off.
+      thinking: { type: 'disabled' },
       ...(generation.temperature === undefined ? {} : { temperature: generation.temperature }),
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -72,7 +76,17 @@ async function callAnthropic(
   }
 
   const data = await response.json();
-  return data.content?.[0]?.text || '';
+  // Concatenate every text block; content[0] may be a thinking block.
+  const blocks: Array<{ type?: string; text?: string }> = Array.isArray(data.content) ? data.content : [];
+  const text = blocks
+    .filter(block => block.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text as string)
+    .join('');
+  if (!text.trim()) {
+    // Not retryable: the same prompt would produce the same shape again.
+    throw new ProviderError(`empty_response:${data.stop_reason ?? 'unknown'}`);
+  }
+  return text;
 }
 
 async function callOpenAI(
@@ -118,6 +132,7 @@ async function callGoogle(
   prompt: string,
   signal: AbortSignal,
   generation: GenerationSettings,
+  action: string,
 ): Promise<string> {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
@@ -177,16 +192,27 @@ async function callGoogle(
     throw new ProviderError('safety_block');
   }
 
-  let text = candidate?.content?.parts?.[0]?.text || '';
+  // Join every non-thought text part (Gemini 3 may return thought parts first).
+  const parts: Array<{ text?: string; thought?: boolean }> = candidate?.content?.parts ?? [];
+  let text = parts
+    .filter(part => typeof part.text === 'string' && part.thought !== true)
+    .map(part => part.text as string)
+    .join('');
 
-  // Clean thinking chain tags
-  text = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim();
-  text = text.replace(/^(思考|分析|让我想想)[：:].*/gm, '').trim();
+  if (!text.trim()) {
+    throw new ProviderError(`empty_response:${candidate?.finishReason ?? 'unknown'}`);
+  }
 
-  // Truncate if too long
-  if (text.length > 500) {
-    const cutoff = text.substring(0, 500).lastIndexOf('。');
-    text = cutoff > 100 ? text.substring(0, cutoff + 1) : text.substring(0, 500);
+  // Speech clean-up only. Verdict actions (voting / quest / assassination /
+  // team_building) must reach the validator untouched: a scrubber could delete
+  // the one word that carries the answer.
+  if (action === 'discussion') {
+    text = text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim();
+    text = text.replace(/^(思考|分析|让我想想)[：:].*/gm, '').trim();
+    if (text.length > 500) {
+      const cutoff = text.substring(0, 500).lastIndexOf('。');
+      text = cutoff > 100 ? text.substring(0, cutoff + 1) : text.substring(0, 500);
+    }
   }
 
   return text;
@@ -326,7 +352,7 @@ export async function callAIProvider(
           text = await callOpenAI(model.model, prompt, controller.signal, generation);
           break;
         case 'google':
-          text = await callGoogle(model.model, prompt, controller.signal, generation);
+          text = await callGoogle(model.model, prompt, controller.signal, generation, action);
           break;
         case 'deepseek':
           text = await callDeepSeek(model.model, prompt, controller.signal, generation);
