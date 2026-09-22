@@ -16,7 +16,6 @@ export default function VotingPanel() {
     revealAllVotes
   } = useGameStore();
 
-  const [hasHumanVoted, setHasHumanVoted] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
   const [aiVotesStarted, setAiVotesStarted] = useState(false);
   const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
@@ -24,6 +23,7 @@ export default function VotingPanel() {
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const hasHumanVoted = pendingVotes[humanPlayerId] !== undefined;
   const currentProposedTeam = gameState?.currentProposedTeam;
   const currentVotes = gameState?.currentVotes;
   const consecutiveRejects = gameState?.consecutiveRejects ?? 0;
@@ -110,7 +110,6 @@ export default function VotingPanel() {
 
   const handleVote = (approve: boolean) => {
     addPendingVote(humanPlayerId, approve);
-    setHasHumanVoted(true);
   };
 
   const handleRetryAIVote = async (playerId: number) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useGameStore } from '@/lib/game/store';
+import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { getCurrentLeader } from '@/lib/game/engine';
 import { DISCUSSION_ROUNDS } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
@@ -143,28 +143,31 @@ function SecureSpeechInput({
 export default function DiscussionPanel() {
   const {
     gameState,
+    phaseProgress,
+    ensurePhaseProgress,
+    appendDiscussionSpeech,
     addDiscussion,
     addSystemEvent,
     nextDiscussionRound,
     goToTeamBuilding,
   } = useGameStore();
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  const [currentSpeakerIndex, setCurrentSpeakerIndex] = useState(0);
-  const [aiResponses, setAiResponses] = useState<Map<number, string>>(new Map());
   const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
   const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
   const requestedStepRef = useRef<number | null>(null);
 
   // 重置状态（当进入新的发言阶段时）
-  useEffect(() => {
-    if (!gameState) return;
+  const phaseKey = getPhaseKey(gameState);
+  const currentSpeakerIndex = phaseProgress.discussion.step;
+  const speeches = phaseProgress.discussion.speeches;
+  const progressIsCurrent = phaseProgress.key === phaseKey;
 
-    setCurrentSpeakerIndex(0);
-    setAiResponses(new Map());
+  useEffect(() => {
+    ensurePhaseProgress();
     setSeatErrors({});
     setSeatErrorTitles({});
     requestedStepRef.current = null;
-  }, [gameState?.currentQuest, gameState?.consecutiveRejects]);
+  }, [phaseKey, ensurePhaseProgress]);
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -187,23 +190,17 @@ export default function DiscussionPanel() {
 
   // 收集之前的发言（用于给 AI 上下文）
   const getRecentSpeeches = (): Array<{ playerId: number; content: string }> => {
-    const speeches: Array<{ playerId: number; content: string }> = [];
-    for (let i = 0; i < currentSpeakerIndex; i++) {
-      const speaker = speakingOrder[i % players.length];
-      const content = aiResponses.get(i);
-      if (speaker && aiResponses.has(i)) {
-        speeches.push({ playerId: speaker.id, content: content! });
-      }
-    }
-    return speeches;
+    return speeches
+      .filter(speech => speech.step < currentSpeakerIndex)
+      .map(({ playerId, content }) => ({ playerId, content }));
   };
 
-  const completeSpeakingStep = (stepIndex: number) => {
+  const completeSpeakingStep = (stepIndex: number, playerId: number, content: string) => {
+    appendDiscussionSpeech(stepIndex, playerId, content);
     if (stepIndex + 1 === players.length) {
       nextDiscussionRound();
     }
     requestedStepRef.current = null;
-    setCurrentSpeakerIndex(stepIndex + 1);
   };
 
   const requestAISpeech = async (playerId: number, stepIndex: number) => {
@@ -235,11 +232,9 @@ export default function DiscussionPanel() {
       }
       const speech = data.speech;
 
-      setAiResponses(prev => new Map(prev).set(stepIndex, speech));
-      addDiscussion(playerId, speech);
-
       await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-      completeSpeakingStep(stepIndex);
+      addDiscussion(playerId, speech);
+      completeSpeakingStep(stepIndex, playerId, speech);
     } catch (error) {
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [stepIndex]: described.message }));
@@ -252,6 +247,7 @@ export default function DiscussionPanel() {
   // AI 自动发言
   useEffect(() => {
     if (!gameState) return;
+    if (!progressIsCurrent) return;
     if (allSpoken || isHumanTurn || isProcessingAI) return;
     if (!currentSpeaker) return;
     if (requestedStepRef.current === currentSpeakerIndex) return;
@@ -264,24 +260,22 @@ export default function DiscussionPanel() {
       500
     );
     return () => clearTimeout(timer);
-  }, [currentSpeakerIndex, isHumanTurn, allSpoken, isProcessingAI]);
+  }, [currentSpeakerIndex, isHumanTurn, allSpoken, isProcessingAI, progressIsCurrent]);
 
   if (!gameState || !leader) return null;
 
   // 人类发言提交
   const handleHumanSpeech = (content: string) => {
     // content 已经被 SecureSpeechInput 验证和清理过了
-    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, content));
     addDiscussion(humanPlayerId, content);
-    completeSpeakingStep(currentSpeakerIndex);
+    completeSpeakingStep(currentSpeakerIndex, humanPlayerId, content);
   };
 
   // 跳过发言
   const handleSkipSpeech = () => {
     const skipMessage = '[选择沉默]';
-    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, skipMessage));
     addDiscussion(humanPlayerId, skipMessage);
-    completeSpeakingStep(currentSpeakerIndex);
+    completeSpeakingStep(currentSpeakerIndex, humanPlayerId, skipMessage);
   };
 
   const handleRetryAISpeech = (playerId: number) => {
@@ -297,10 +291,9 @@ export default function DiscussionPanel() {
       delete next[currentSpeakerIndex];
       return next;
     });
-    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, ''));
     addDiscussion(playerId, '');
     addSystemEvent(`玩家${playerId}（${modelName}）的发言已跳过（AI 不可用）`);
-    completeSpeakingStep(currentSpeakerIndex);
+    completeSpeakingStep(currentSpeakerIndex, playerId, '');
   };
 
   // 结束发言阶段
@@ -333,7 +326,7 @@ export default function DiscussionPanel() {
       <div className="space-y-3 max-h-[300px] overflow-y-auto">
         {Array.from({ length: Math.min(currentSpeakerIndex, totalSpeakingSteps) }, (_, index) => {
           const player = speakingOrder[index % players.length];
-          const speech = aiResponses.get(index);
+          const speech = speeches.find(entry => entry.step === index)?.content;
           const isHuman = player.id === humanPlayerId;
           const round = Math.floor(index / players.length) + 1;
 

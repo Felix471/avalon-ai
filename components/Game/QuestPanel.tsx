@@ -11,7 +11,6 @@ import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function QuestPanel() {
   const { gameState, questAction, addSystemEvent } = useGameStore();
-  const [aiActionsSubmitted, setAiActionsSubmitted] = useState<Set<number>>(new Set());
   const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
   const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
   const [isProcessingAI, setIsProcessingAI] = useState(false);
@@ -65,7 +64,6 @@ export default function QuestPanel() {
 
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
       questAction(playerId, success);
-      setAiActionsSubmitted(prev => new Set([...prev, playerId]));
       return true;
     } catch (error) {
       const described = describeAIError(error);
@@ -84,7 +82,6 @@ export default function QuestPanel() {
     const submitAIActions = async () => {
       for (const member of teamMembers) {
         if (member.isHuman) continue;
-        if (aiActionsSubmitted.has(member.id)) continue;
         if (hasPlayerActed(gameState, member.id)) continue;
         if (seatErrors[member.id]) break;
 
@@ -118,7 +115,6 @@ export default function QuestPanel() {
       return next;
     });
     questAction(playerId, true);
-    setAiActionsSubmitted(prev => new Set([...prev, playerId]));
     addSystemEvent(`玩家${playerId}（${modelName}）任务行动已跳过，按成功计`);
     setRetryVersion(version => version + 1);
   };

@@ -10,6 +10,36 @@ import {
   shouldHaveDiscussion
 } from './engine';
 
+export interface PhaseProgress {
+  key: string;
+  discussion: {
+    step: number;
+    speeches: Array<{ step: number; playerId: number; content: string }>;
+  };
+  teamBuilding: {
+    humanOverride: boolean;
+    selectedPlayers: number[];
+  };
+  assassination: {
+    humanOverride: boolean;
+  };
+}
+
+export function getPhaseKey(gameState: GameState | null): string {
+  return gameState
+    ? `${gameState.phase}:${gameState.currentQuest}:${gameState.consecutiveRejects}`
+    : 'lobby:0:0';
+}
+
+function createPhaseProgress(gameState: GameState | null): PhaseProgress {
+  return {
+    key: getPhaseKey(gameState),
+    discussion: { step: 0, speeches: [] },
+    teamBuilding: { humanOverride: false, selectedPlayers: [] },
+    assassination: { humanOverride: false },
+  };
+}
+
 interface GameStore {
   // 游戏配置（大厅阶段）
   config: GameConfig;
@@ -17,6 +47,17 @@ interface GameStore {
 
   // 游戏状态
   gameState: GameState | null;
+
+  phaseProgress: PhaseProgress;
+  getPhaseKey: () => string;
+  ensurePhaseProgress: () => PhaseProgress;
+  setDiscussionProgress: (
+    step: number,
+    speeches: PhaseProgress['discussion']['speeches']
+  ) => void;
+  appendDiscussionSpeech: (step: number, playerId: number, content: string) => void;
+  setTeamBuildingProgress: (updates: Partial<PhaseProgress['teamBuilding']>) => void;
+  setAssassinationProgress: (updates: Partial<PhaseProgress['assassination']>) => void;
 
   // 游戏操作
   startGame: () => void;
@@ -92,9 +133,75 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       config: defaultConfig,
       gameState: null,
+      phaseProgress: createPhaseProgress(null),
       pendingAIPlayers: [],
       pendingVotes: {},
       pendingQuestActions: {},
+
+      getPhaseKey: () => getPhaseKey(get().gameState),
+
+      ensurePhaseProgress: () => {
+        const state = get();
+        const key = getPhaseKey(state.gameState);
+        if (state.phaseProgress.key === key) return state.phaseProgress;
+
+        const phaseProgress = createPhaseProgress(state.gameState);
+        set({ phaseProgress });
+        return phaseProgress;
+      },
+
+      setDiscussionProgress: (step, speeches) => {
+        const phaseProgress = get().ensurePhaseProgress();
+        set({
+          phaseProgress: {
+            ...phaseProgress,
+            discussion: { step, speeches },
+          },
+        });
+      },
+
+      appendDiscussionSpeech: (step, playerId, content) => {
+        const phaseProgress = get().ensurePhaseProgress();
+        if (
+          step < phaseProgress.discussion.step
+          || phaseProgress.discussion.speeches.some(speech => speech.step === step)
+        ) {
+          return;
+        }
+
+        set({
+          phaseProgress: {
+            ...phaseProgress,
+            discussion: {
+              step: step + 1,
+              speeches: [
+                ...phaseProgress.discussion.speeches,
+                { step, playerId, content },
+              ],
+            },
+          },
+        });
+      },
+
+      setTeamBuildingProgress: (updates) => {
+        const phaseProgress = get().ensurePhaseProgress();
+        set({
+          phaseProgress: {
+            ...phaseProgress,
+            teamBuilding: { ...phaseProgress.teamBuilding, ...updates },
+          },
+        });
+      },
+
+      setAssassinationProgress: (updates) => {
+        const phaseProgress = get().ensurePhaseProgress();
+        set({
+          phaseProgress: {
+            ...phaseProgress,
+            assassination: { ...phaseProgress.assassination, ...updates },
+          },
+        });
+      },
 
       updateConfig: (updates) => set(state => ({
         config: { ...state.config, ...updates }
@@ -103,12 +210,18 @@ export const useGameStore = create<GameStore>()(
       startGame: () => {
         const { config } = get();
         const gameState = createGame(config);
-        set({ gameState, pendingVotes: {}, pendingQuestActions: {} });
+        set({
+          gameState,
+          phaseProgress: createPhaseProgress(gameState),
+          pendingVotes: {},
+          pendingQuestActions: {},
+        });
       },
 
       // 重置游戏状态，但保留部分配置（通常用于"再来一局"）
       resetGame: () => set({
         gameState: null,
+        phaseProgress: createPhaseProgress(null),
         // config: defaultConfig, // 这里可以选择是否重置配置，通常玩家希望保留配置
         pendingAIPlayers: [],
         pendingVotes: {},
@@ -125,6 +238,7 @@ export const useGameStore = create<GameStore>()(
         set({
           config: defaultConfig,
           gameState: null,
+          phaseProgress: createPhaseProgress(null),
           pendingAIPlayers: [],
           pendingVotes: {},
           pendingQuestActions: {},
@@ -259,11 +373,25 @@ export const useGameStore = create<GameStore>()(
         }
         return localStorage;
       }),
-      // 只持久化 config 和 gameState，忽略 pending 状态和函数
+      // Persist durable game data without serializing store actions.
+      version: 2,
       partialize: (state) => ({
         config: state.config,
         gameState: state.gameState,
+        phaseProgress: state.phaseProgress,
+        pendingVotes: state.pendingVotes,
       }),
+      migrate: (persistedState, version) => {
+        const state = persistedState as Partial<GameStore>;
+        if (version < 2) {
+          return {
+            ...state,
+            phaseProgress: createPhaseProgress(state.gameState ?? null),
+            pendingVotes: {},
+          };
+        }
+        return state;
+      },
       onRehydrateStorage: () => {
         return () => {
           setHydrated();

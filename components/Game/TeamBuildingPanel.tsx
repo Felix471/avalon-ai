@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useGameStore } from '@/lib/game/store';
+import { getPhaseKey, useGameStore } from '@/lib/game/store';
 import { getCurrentLeader, isForcedTeamBuilding } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,10 +10,15 @@ import AISeatError from './AISeatError';
 import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function TeamBuildingPanel() {
-  const { gameState, proposeTeam, addSystemEvent } = useGameStore();
-  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
+  const {
+    gameState,
+    phaseProgress,
+    ensurePhaseProgress,
+    setTeamBuildingProgress,
+    proposeTeam,
+    addSystemEvent,
+  } = useGameStore();
   const [isAISelecting, setIsAISelecting] = useState(false);
-  const [humanOverride, setHumanOverride] = useState(false);
   const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
   const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
@@ -26,6 +31,15 @@ export default function TeamBuildingPanel() {
   const requiredSize = quest?.requiredPlayers ?? 0;
   const isHumanLeader = leader?.id === humanPlayerId;
   const isForced = gameState ? isForcedTeamBuilding(gameState) : false;
+  const phaseKey = getPhaseKey(gameState);
+  const progressIsCurrent = phaseProgress.key === phaseKey;
+  const { humanOverride, selectedPlayers } = phaseProgress.teamBuilding;
+
+  useEffect(() => {
+    ensurePhaseProgress();
+    setSeatErrors({});
+    setSeatErrorTitles({});
+  }, [phaseKey, ensurePhaseProgress]);
 
   const requestAITeam = async (playerId: number) => {
     if (!gameState) return;
@@ -73,18 +87,20 @@ export default function TeamBuildingPanel() {
 
   // AI队长自动选队
   useEffect(() => {
-    if (!gameState || !leader || isHumanLeader || humanOverride || isAISelecting || seatErrors[leader.id]) return;
+    if (!gameState || !leader || !progressIsCurrent || isHumanLeader || humanOverride || isAISelecting || seatErrors[leader.id]) return;
 
     requestAITeam(leader.id);
-  }, [isHumanLeader, leader?.id]);
+  }, [isHumanLeader, leader?.id, progressIsCurrent]);
 
   if (!gameState || !leader || !quest) return null;
 
   const togglePlayer = (playerId: number) => {
     if (selectedPlayers.includes(playerId)) {
-      setSelectedPlayers(prev => prev.filter(id => id !== playerId));
+      setTeamBuildingProgress({
+        selectedPlayers: selectedPlayers.filter(id => id !== playerId),
+      });
     } else if (selectedPlayers.length < requiredSize) {
-      setSelectedPlayers(prev => [...prev, playerId]);
+      setTeamBuildingProgress({ selectedPlayers: [...selectedPlayers, playerId] });
     }
   };
 
@@ -98,7 +114,7 @@ export default function TeamBuildingPanel() {
     if (!leader) return;
     const modelName = leader.aiModel?.name || 'AI';
     setSeatErrors({});
-    setHumanOverride(true);
+    setTeamBuildingProgress({ humanOverride: true });
     addSystemEvent(`队长 玩家${leader.id}（${modelName}）不可用，由你代为组队`);
   };
 
