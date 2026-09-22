@@ -68,7 +68,6 @@ export default function VotingPanel() {
       await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
       return true;
     } catch (error) {
-      console.error('AI Vote Error:', error);
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
       setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));

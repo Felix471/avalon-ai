@@ -24,12 +24,7 @@ export default function GamePage() {
   const { gameState } = useGameStore();
 
   useEffect(() => {
-    console.log('[GamePage] hydrated:', hydrated, 'gameState:', gameState ? '存在' : '空');
-  }, [hydrated, gameState]);
-
-  useEffect(() => {
     if (hydrated && !gameState) {
-      console.log('[GamePage] 没有游戏状态，跳转到首页');
       router.push('/');
     }
   }, [hydrated, gameState, router]);

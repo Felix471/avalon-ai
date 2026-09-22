@@ -314,7 +314,6 @@ export async function callAIProvider(
 
       if (isRetryable && attempt < MAX_RETRIES) {
         const delay = INITIAL_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`[AI_CALL] ${errorCode} from ${model.provider}; retrying in ${delay}ms`);
         await sleep(delay);
         continue;
       }

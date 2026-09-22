@@ -55,7 +55,6 @@ export default function AssassinationPanel() {
       await new Promise(resolve => setTimeout(resolve, 2000));
       assassinate(data.targetId);
     } catch (error) {
-      console.error('AI Assassination Error:', error);
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
       setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));

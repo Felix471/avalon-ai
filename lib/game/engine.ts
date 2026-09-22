@@ -55,8 +55,6 @@ export function createGame(config: GameConfig): GameState {
     result: 'pending',
   }));
 
-  console.log('[createGame] 创建游戏, variantRules:', variantRules);
-
   return {
     gameId: generateId(),
     playerCount,
@@ -166,20 +164,17 @@ export function startTeamBuilding(state: GameState): GameState {
 export function shouldHaveDiscussion(state: GameState): boolean {
   // 第5次组队（force_team模式下）直接跳过发言
   if (state.variantRules.fifthVoteRule === 'force_team' && state.consecutiveRejects >= 4) {
-    console.log('[shouldHaveDiscussion] 第5次组队，跳过发言');
     return false;
   }
 
   // every_time 模式：每次都发言
   if (state.variantRules.discussionMode === 'every_time') {
-    console.log('[shouldHaveDiscussion] every_time 模式，需要发言');
     return true;
   }
 
   // first_only 模式：只有本任务第一次组队才发言
   if (state.variantRules.discussionMode === 'first_only') {
     const result = !state.hasDiscussedThisQuest;
-    console.log('[shouldHaveDiscussion] first_only 模式, hasDiscussedThisQuest:', state.hasDiscussedThisQuest, ', 需要发言:', result);
     return result;
   }
 
@@ -202,8 +197,6 @@ export function proposeTeam(state: GameState, teamIds: number[]): GameState {
 
   const isForcedTeam = state.variantRules.fifthVoteRule === 'force_team' &&
                        state.consecutiveRejects >= 4;
-
-  console.log('[proposeTeam] 提议队伍:', teamIds, ', 强制组队:', isForcedTeam);
 
   if (isForcedTeam) {
     const newState = addEvent(state, {
@@ -276,7 +269,6 @@ function resolveVote(state: GameState): GameState {
   });
 
   if (passed) {
-    console.log('[resolveVote] 投票通过，进入任务阶段');
     return {
       ...updatedState,
       phase: 'quest',
@@ -291,11 +283,8 @@ function resolveVote(state: GameState): GameState {
     // 投票否决
     const newConsecutiveRejects = state.consecutiveRejects + 1;
 
-    console.log('[resolveVote] 投票否决，consecutiveRejects:', newConsecutiveRejects);
-
     // 检查是否使用 evil_wins 规则且连续否决5次
     if (state.variantRules.fifthVoteRule === 'evil_wins' && newConsecutiveRejects >= 5) {
-      console.log('[resolveVote] 连续5次否决，坏人获胜');
       return {
         ...updatedState,
         phase: 'game_over',
@@ -317,12 +306,6 @@ function resolveVote(state: GameState): GameState {
     // 判断下一阶段
     const shouldDiscuss = shouldHaveDiscussion(nextState);
     const nextPhase = shouldDiscuss ? 'discussion' : 'team_building';
-
-    console.log('[resolveVote] 下一阶段:', nextPhase, {
-      discussionMode: nextState.variantRules.discussionMode,
-      hasDiscussedThisQuest: nextState.hasDiscussedThisQuest,
-      shouldHaveDiscussion: shouldDiscuss,
-    });
 
     return { ...nextState, phase: nextPhase };
   }
@@ -367,8 +350,6 @@ function resolveQuest(state: GameState): GameState {
   const newGoodWins = state.goodWins + (questSuccess ? 1 : 0);
   const newEvilWins = state.evilWins + (questSuccess ? 0 : 1);
 
-  console.log('[resolveQuest] 任务结果:', questSuccess ? '成功' : '失败', ', 失败票:', failCount);
-
   let updatedState = addEvent({
     ...state,
     quests: updatedQuests,
@@ -382,15 +363,12 @@ function resolveQuest(state: GameState): GameState {
 
   // 检查游戏是否结束
   if (newGoodWins >= 3) {
-    console.log('[resolveQuest] 好人赢了3个任务，进入刺杀阶段');
     return { ...updatedState, phase: 'assassination' };
   } else if (newEvilWins >= 3) {
-    console.log('[resolveQuest] 坏人获胜');
     return { ...updatedState, phase: 'game_over', winner: 'evil' };
   }
 
   // 继续下一轮 - 重要：重置状态
-  console.log('[resolveQuest] 进入下一轮任务，重置 hasDiscussedThisQuest 和 consecutiveRejects');
   return advanceLeader({
     ...updatedState,
     currentQuest: state.currentQuest + 1,

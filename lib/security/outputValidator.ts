@@ -202,18 +202,10 @@ export function logSuspiciousActivity(
   output: string,
   reason: string
 ): void {
-  const logEntry = {
-    timestamp: new Date().toISOString(),
-    playerId,
-    action,
-    inputPreview: input.substring(0, 100),
-    outputPreview: output.substring(0, 100),
-    reason,
-  };
-
-  // 在开发环境打印到控制台
-  console.warn('[SECURITY] Suspicious AI activity detected:', logEntry);
-
-  // TODO: 在生产环境中，发送到监控服务
-  // await sendToMonitoringService(logEntry);
+  void playerId;
+  void action;
+  void input;
+  void output;
+  void reason;
+  return;
 }

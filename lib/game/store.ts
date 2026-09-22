@@ -21,7 +21,7 @@ interface GameStore {
   // 游戏操作
   startGame: () => void;
   resetGame: () => void;
-  clearSavedGame: () => void; // [新增] 清除存档
+  clearSavedGame: () => void; // 清除存档
 
   // 阶段转换
   setPhase: (phase: GamePhase) => void;
@@ -115,7 +115,7 @@ export const useGameStore = create<GameStore>()(
         pendingQuestActions: {},
       }),
 
-      // [新增] 彻底清除存档并重置所有状态
+      // 彻底清除存档并重置所有状态
       clearSavedGame: () => {
         // 1. 清除 LocalStorage
         if (typeof window !== 'undefined') {
@@ -265,13 +265,7 @@ export const useGameStore = create<GameStore>()(
         gameState: state.gameState,
       }),
       onRehydrateStorage: () => {
-        console.log('[Zustand] Hydration 开始...');
-        return (state, error) => {
-          if (error) {
-            console.error('[Zustand] Hydration 错误:', error);
-          } else {
-            console.log('[Zustand] Hydration 完成');
-          }
+        return () => {
           setHydrated();
         };
       },

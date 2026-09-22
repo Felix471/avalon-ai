@@ -227,7 +227,6 @@ export default function DiscussionPanel() {
       await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
       setCurrentSpeakerIndex(prev => prev + 1);
     } catch (error) {
-      console.error('AI 发言错误:', error);
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
       setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));

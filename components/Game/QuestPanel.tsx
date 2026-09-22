@@ -68,7 +68,6 @@ export default function QuestPanel() {
       setAiActionsSubmitted(prev => new Set([...prev, playerId]));
       return true;
     } catch (error) {
-      console.error('AI Quest Error:', error);
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
       setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));

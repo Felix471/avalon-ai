@@ -1,18 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore, useHydration } from '@/lib/game/store';
-import { AI_MODELS } from '@/lib/game/types';
+import { AI_MODELS, type VariantRules } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Users, Play, Bot, Info, Heart, AlertCircle, Trash2, ArrowRight
+  Users, Play, Bot, Info, AlertCircle, Trash2, ArrowRight
 } from 'lucide-react';
 
 // ==================== 大厅主组件 ====================
 
 function LobbyContent() {
   const router = useRouter();
+  const [startError, setStartError] = useState<string | null>(null);
   // 添加 gameState 和 resetGame 用于恢复/重置游戏
   const { config, updateConfig, startGame, gameState, resetGame } = useGameStore();
   // 添加 hydration 检查
@@ -27,9 +29,10 @@ function LobbyContent() {
       ? config.enabledModels.filter(id => id !== modelId)
       : [...config.enabledModels, modelId];
     updateConfig({ enabledModels: newModels });
+    setStartError(null);
   };
 
-  const handleVariantChange = (key: string, value: any) => {
+  const handleVariantChange = (key: keyof VariantRules, value: VariantRules[keyof VariantRules]) => {
     updateConfig({
       variantRules: { ...config.variantRules, [key]: value }
     });
@@ -37,7 +40,7 @@ function LobbyContent() {
 
   const handleStartGame = () => {
     if (config.enabledModels.length < 2) {
-      alert('请至少选择 2 个 AI 模型');
+      setStartError('请至少选择 2 个 AI 模型');
       return;
     }
 
@@ -64,21 +67,6 @@ function LobbyContent() {
             <h1 className="text-4xl font-bold text-amber-400">AI 阿瓦隆</h1>
           </div>
           <p className="text-slate-400">与多个 AI 模型一起玩阿瓦隆桌游</p>
-        </div>
-
-        {/* API 付费提示 */}
-        <div className="mb-6 p-4 bg-gradient-to-r from-pink-900/30 to-purple-900/30 rounded-xl border border-pink-500/30">
-          <div className="flex items-start gap-3">
-            <Heart className="w-5 h-5 text-pink-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-slate-300">
-              <span className="text-pink-400 font-medium">温馨提示 💕</span>
-              <p className="mt-1">
-                目前游戏中的大模型 API 调用费用由作者个人承担，为了让这个小项目能持续运营，
-                请不要将链接分享到面向不特定公众的平台（如小红书、微博、微信群等）。
-                如果想分享给现实中的朋友，请先征得作者同意哦~ 感谢理解！🙏✨
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -137,12 +125,6 @@ function LobbyContent() {
                     style={{ backgroundColor: model.color }}
                   />
                   <span className="text-white flex-1">{model.name}</span>
-                  {/* Gemini Pro 慢速提示 */}
-                  {model.id === 'gemini-pro' && (
-                    <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">
-                      ⏳ 较慢
-                    </span>
-                  )}
                 </label>
               ))}
             </div>
@@ -280,6 +262,7 @@ function LobbyContent() {
 
           {/* 如果有未完成的游戏，可以考虑禁用下面的按钮，或者保留让用户强制覆盖 */}
           <div className="text-center">
+            {startError && <p className="text-red-400 text-sm">{startError}</p>}
             <Button
               onClick={handleStartGame}
               size="lg"
@@ -295,7 +278,7 @@ function LobbyContent() {
 
         {/* 底部信息 */}
         <div className="mt-8 text-center text-slate-500 text-sm">
-          <p>Made with ❤️ by Felix</p>
+          <p>Ziyi (Felix) Wang · <a href="https://github.com/Felix471/avalon-ai" className="underline hover:text-slate-300">GitHub</a></p>
         </div>
       </div>
     </div>

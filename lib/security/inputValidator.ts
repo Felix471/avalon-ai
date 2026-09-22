@@ -1,12 +1,4 @@
-/**
- * 输入验证器 v2 - 防止 Prompt Injection 攻击（加强版）
- *
- * 更新内容：
- * - 新增 Base64 编码检测
- * - 新增 SQL 注入字符检测
- * - 新增社会工程关键词
- * - 新增紧急/权威伪装检测
- */
+// Input validation for human speech: length limits, prompt-injection patterns, character escaping.
 
 // ==================== 配置常量 ====================
 
@@ -166,12 +158,6 @@ export function validateSpeechInput(input: string): ValidationResult {
   // 检查 3: 可疑模式检测（核心防护）
   for (const pattern of SUSPICIOUS_PATTERNS) {
     if (pattern.test(sanitized)) {
-      // 记录被拦截的内容（用于后续分析）
-      console.warn('[INPUT_BLOCKED]', {
-        pattern: pattern.toString(),
-        input: sanitized.substring(0, 50),
-      });
-
       return {
         isValid: false,
         sanitizedInput: '',

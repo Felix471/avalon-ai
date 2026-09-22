@@ -63,7 +63,6 @@ export default function TeamBuildingPanel() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       proposeTeam(team);
     } catch (error) {
-      console.error('AI Team Building Error:', error);
       const described = describeAIError(error);
       setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
       setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));

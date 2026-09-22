@@ -1,4 +1,3 @@
-// components/Game/ExitGameButton.tsx
 'use client';
 
 import { useState } from 'react';
