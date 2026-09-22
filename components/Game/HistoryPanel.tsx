@@ -21,7 +21,7 @@ export default function HistoryPanel() {
     passed: boolean;
   }> = [];
 
-  let currentQuestVoteCount: Record<number, number> = {};
+  const currentQuestVoteCount: Record<number, number> = {};
 
   gameState.events.forEach((event, index) => {
     if (event.type === 'team_proposal') {
@@ -29,7 +29,7 @@ export default function HistoryPanel() {
       currentQuestVoteCount[questNum] = (currentQuestVoteCount[questNum] || 0) + 1;
 
       // 找到这次提议对应的投票结果
-      const team = event.metadata?.team as number[] || [];
+      const team = Array.isArray(event.metadata?.team) ? (event.metadata.team as number[]) : [];
       const leaderId = event.playerId || 0;
 
       // 查找后续的投票事件，直到下一个 team_proposal 或 quest_result

@@ -182,7 +182,7 @@ export interface GameEvent {
   playerId?: number;
   playerName?: string;
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // ==================== 变体规则 ====================

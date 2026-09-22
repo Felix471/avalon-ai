@@ -262,7 +262,7 @@ function resolveVote(state: GameState): GameState {
   const rejectCount = Object.values(votes).filter(v => !v).length;
   const passed = approveCount > rejectCount;
 
-  let updatedState = addEvent(state, {
+  const updatedState = addEvent(state, {
     type: 'vote_result',
     content: `投票结果: ${approveCount}票同意, ${rejectCount}票反对 - ${passed ? '通过' : '否决'}`,
     metadata: { approveCount, rejectCount, passed },
@@ -350,7 +350,7 @@ function resolveQuest(state: GameState): GameState {
   const newGoodWins = state.goodWins + (questSuccess ? 1 : 0);
   const newEvilWins = state.evilWins + (questSuccess ? 0 : 1);
 
-  let updatedState = addEvent({
+  const updatedState = addEvent({
     ...state,
     quests: updatedQuests,
     goodWins: newGoodWins,
