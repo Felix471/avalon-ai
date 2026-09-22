@@ -55,14 +55,20 @@ export default function QuestPanel() {
           }),
         });
 
+        const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+
         const data = await readAIResponse(response);
         if (typeof data.success !== 'boolean') {
           throw new Error('AI quest response must include success as a boolean');
         }
         success = data.success;
-      }
 
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+        if (!isMockResponse) {
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+        }
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+      }
       questAction(playerId, success);
       return true;
     } catch (error) {
@@ -162,6 +168,7 @@ export default function QuestPanel() {
             // 坏人可以选择
             <div className="space-y-2">
               <Button
+                data-testid="quest-success"
                 onClick={() => handleAction(true)}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
@@ -169,6 +176,7 @@ export default function QuestPanel() {
                 任务成功（伪装好人）
               </Button>
               <Button
+                data-testid="quest-fail"
                 onClick={() => handleAction(false)}
                 className="w-full bg-red-600 hover:bg-red-700"
               >
@@ -183,6 +191,7 @@ export default function QuestPanel() {
             // 好人只能成功
             <div className="space-y-2">
               <Button
+                data-testid="quest-success"
                 onClick={() => handleAction(true)}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >

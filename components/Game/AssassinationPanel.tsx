@@ -58,6 +58,8 @@ export default function AssassinationPanel() {
         }),
       });
 
+      const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+
       const data = await readAIResponse(response);
       if (
         typeof data.targetId !== 'number'
@@ -67,7 +69,9 @@ export default function AssassinationPanel() {
         throw new Error('AI assassination response must target a good player');
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!isMockResponse) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
       assassinate(data.targetId);
     } catch (error) {
       const described = describeAIError(error);
@@ -156,6 +160,7 @@ export default function AssassinationPanel() {
         {goodPlayers.map(player => (
           <button
             key={player.id}
+            data-testid={`assassinate-${player.id}`}
             onClick={() => setSelectedTarget(player.id)}
             className={`
               w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left
@@ -180,6 +185,7 @@ export default function AssassinationPanel() {
       </div>
 
       <Button
+        data-testid="assassinate-confirm"
         onClick={handleAssassinate}
         disabled={!selectedTarget}
         className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50"

@@ -80,6 +80,7 @@ function LobbyContent() {
               {playerCounts.map(count => (
                 <button
                   key={count}
+                  data-testid={`lobby-player-count-${count}`}
                   onClick={() => handlePlayerCountChange(count)}
                   className={`
                     py-3 px-4 rounded-lg font-medium transition-all
@@ -264,6 +265,7 @@ function LobbyContent() {
           <div className="text-center">
             {startError && <p className="text-red-400 text-sm">{startError}</p>}
             <Button
+              data-testid="lobby-start"
               onClick={handleStartGame}
               size="lg"
               // 如果有游戏正在进行，将主要按钮样式稍微降级，或者保持原样。

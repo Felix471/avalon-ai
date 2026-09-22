@@ -122,7 +122,7 @@ export default function GamePage() {
           </div>
 
           {/* ========== 右侧：玩家交互面板 ========== */}
-          <div className="lg:col-span-4 space-y-4 order-3">
+          <div data-testid="phase-panel" className="lg:col-span-4 space-y-4 order-3">
             {/* 当前阶段操作面板 */}
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 min-h-[280px]">
               {renderPhasePanel()}

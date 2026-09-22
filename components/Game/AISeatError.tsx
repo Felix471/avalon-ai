@@ -18,7 +18,7 @@ export default function AISeatError({
   skipLabel = '跳过',
 }: AISeatErrorProps) {
   return (
-    <div className="space-y-2 rounded-lg border border-red-800 bg-slate-800/70 p-3">
+    <div data-testid="seat-error" className="space-y-2 rounded-lg border border-red-800 bg-slate-800/70 p-3">
       <div className="text-sm font-medium text-amber-300">
         玩家{playerId} ({modelName || 'AI'})
       </div>

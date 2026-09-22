@@ -25,6 +25,11 @@ import { isMockAIEnabled } from '@/lib/ai/mockProvider';
 
 type AIModelRef = { provider: string; model: string };
 
+function markMockResponse(response: NextResponse) {
+  response.headers.set('x-avalon-mock-ai', isMockAIEnabled() ? '1' : '0');
+  return response;
+}
+
 function providerFailureResponse(model: AIModelRef, result: Extract<AIProviderResult, { ok: false }>) {
   return NextResponse.json(
     {
@@ -107,20 +112,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let response: NextResponse;
     switch (action) {
       case 'discussion':
-        return await handleDiscussion(gameState, playerId, recentSpeeches || [], promptMode);
+        response = await handleDiscussion(gameState, playerId, recentSpeeches || [], promptMode);
+        break;
       case 'voting':
-        return await handleVoting(gameState, playerId, promptMode);
+        response = await handleVoting(gameState, playerId, promptMode);
+        break;
       case 'quest':
-        return await handleQuestAction(gameState, playerId, promptMode);
+        response = await handleQuestAction(gameState, playerId, promptMode);
+        break;
       case 'team_building':
-        return await handleTeamBuilding(gameState, playerId, promptMode);
+        response = await handleTeamBuilding(gameState, playerId, promptMode);
+        break;
       case 'assassination':
-        return await handleAssassination(gameState, playerId, promptMode);
+        response = await handleAssassination(gameState, playerId, promptMode);
+        break;
       default:
         return NextResponse.json({ error: '未知的操作类型' }, { status: 400 });
     }
+
+    return markMockResponse(response);
 
   } catch (error) {
     console.error('AI API Error:', error);

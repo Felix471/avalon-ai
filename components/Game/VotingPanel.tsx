@@ -59,13 +59,17 @@ export default function VotingPanel() {
         }),
       });
 
+      const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+
       const data = await readAIResponse(response);
       if (typeof data.approve !== 'boolean') {
         throw new Error('AI voting response must include approve as a boolean');
       }
 
       addPendingVote(playerId, data.approve);
-      await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+      if (!isMockResponse) {
+        await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+      }
       return true;
     } catch (error) {
       const described = describeAIError(error);
@@ -189,6 +193,7 @@ export default function VotingPanel() {
           </p>
           <div className="flex gap-3">
             <Button
+              data-testid="vote-approve"
               onClick={() => handleVote(true)}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
@@ -196,6 +201,7 @@ export default function VotingPanel() {
               同意
             </Button>
             <Button
+              data-testid="vote-reject"
               onClick={() => handleVote(false)}
               className="flex-1 bg-red-600 hover:bg-red-700"
             >

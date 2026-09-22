@@ -13,7 +13,7 @@ export default function QuestTracker() {
   const doubleFailQuests = DOUBLE_FAIL_QUESTS[playerCount] || [];
 
   return (
-    <div className="flex items-center gap-1">
+    <div data-testid="quest-tracker" className="flex items-center gap-1">
       {quests.map((quest, index) => {
         const questNumber = index + 1;
         const isCurrent = questNumber === currentQuest;
@@ -42,6 +42,7 @@ export default function QuestTracker() {
         return (
           <div
             key={questNumber}
+            data-quest-result={quest.result}
             className={`
               relative flex flex-col items-center justify-center
               w-12 h-14 rounded-lg border-2 transition-all

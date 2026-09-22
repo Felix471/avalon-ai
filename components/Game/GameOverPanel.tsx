@@ -27,7 +27,7 @@ export default function GameOverPanel() {
   };
 
   return (
-    <div className="text-center space-y-4">
+    <div data-testid="game-over" className="text-center space-y-4">
       {/* 胜负结果 */}
       <div className={`text-6xl ${humanWon ? 'animate-bounce' : ''}`}>
         {humanWon ? '🎉' : '💀'}

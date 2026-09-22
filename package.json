@@ -18,6 +18,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "batch": "tsx scripts/batch.ts",
     "smoke": "tsx scripts/smoke.ts",
     "metrics": "tsx scripts/metrics.ts"
@@ -40,6 +42,7 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

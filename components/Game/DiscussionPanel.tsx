@@ -226,13 +226,17 @@ export default function DiscussionPanel() {
         }),
       });
 
+      const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
+
       const data = await readAIResponse(response);
       if (typeof data.speech !== 'string') {
         throw new Error('AI discussion response must include speech as a string');
       }
       const speech = data.speech;
 
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+      if (!isMockResponse) {
+        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+      }
       addDiscussion(playerId, speech);
       completeSpeakingStep(stepIndex, playerId, speech);
     } catch (error) {
@@ -377,6 +381,7 @@ export default function DiscussionPanel() {
               />
 
               <Button
+                data-testid="discussion-skip"
                 variant="ghost"
                 size="sm"
                 onClick={handleSkipSpeech}
@@ -444,7 +449,7 @@ export default function DiscussionPanel() {
       {allSpoken && (
         <div className="text-center space-y-3">
           <p className="text-green-400">✓ 所有玩家发言完毕</p>
-          <Button onClick={handleEndDiscussion} className="w-full">
+          <Button data-testid="discussion-end" onClick={handleEndDiscussion} className="w-full">
             进入组队阶段 →
           </Button>
         </div>

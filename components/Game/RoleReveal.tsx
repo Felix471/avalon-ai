@@ -109,6 +109,7 @@ export default function RoleReveal() {
       )}
 
       <Button
+        data-testid="role-reveal-continue"
         onClick={handleContinue}
         className="w-full bg-amber-500 hover:bg-amber-600"
       >

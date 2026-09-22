@@ -58,9 +58,9 @@ export default function TeamBuildingPanel() {
           gameState,
           playerId,
           action: 'team_building',
-          requiredSize,
         }),
       });
+      const isMockResponse = response.headers.get('x-avalon-mock-ai') === '1';
       const data = await readAIResponse(response);
       const validPlayerIds = new Set(players.map(player => player.id));
       const team = data.team;
@@ -74,7 +74,9 @@ export default function TeamBuildingPanel() {
         throw new Error(`AI team response must contain ${requiredSize} unique valid player ids`);
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!isMockResponse) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       proposeTeam(team);
     } catch (error) {
       const described = describeAIError(error);
@@ -194,6 +196,7 @@ export default function TeamBuildingPanel() {
           return (
             <label
               key={player.id}
+              data-testid={`team-pick-${player.id}`}
               className={`
                 flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-sm
                 ${isSelected 
@@ -224,6 +227,7 @@ export default function TeamBuildingPanel() {
       </div>
 
       <Button
+        data-testid="team-confirm"
         onClick={handleSubmit}
         disabled={selectedPlayers.length !== requiredSize}
         className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50"
