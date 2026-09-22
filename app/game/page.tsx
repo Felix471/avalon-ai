@@ -25,7 +25,7 @@ export default function GamePage() {
 
   useEffect(() => {
     if (hydrated && !gameState) {
-      router.push('/');
+      router.push('/play');
     }
   }, [hydrated, gameState, router]);
 

@@ -23,7 +23,7 @@ export default function GameOverPanel() {
 
   const handlePlayAgain = () => {
     resetGame();
-    router.push('/');
+    router.push('/play');
   };
 
   return (

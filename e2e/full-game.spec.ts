@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { AI_MODELS } from '@/lib/game/types';
 
-// Change only this constant when the lobby moves to /play.
-const LOBBY_PATH = '/';
+const LOBBY_PATH = '/play';
 
 test('plays a 5-player mock game to game over', async ({ page }) => {
   await page.goto(LOBBY_PATH);
@@ -101,4 +100,15 @@ test('lobby renders', async ({ page }) => {
   for (const model of AI_MODELS) {
     await expect(page.getByText(model.name, { exact: true })).toBeVisible();
   }
+});
+
+test('landing page links to the lobby', async ({ page }) => {
+  await page.goto('/');
+
+  const playLink = page.getByTestId('landing-play');
+  await expect(playLink).toBeVisible();
+  await playLink.click();
+
+  await expect(page).toHaveURL(/\/play$/);
+  await expect(page.getByTestId('lobby-start')).toBeVisible();
 });

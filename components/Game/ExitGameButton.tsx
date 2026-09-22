@@ -24,7 +24,7 @@ export function ExitGameButton() {
   const confirmExit = () => {
     // 直接返回主页，游戏状态保留在 store 中
     // 主页会检测到进行中的游戏并显示"是否继续"提示
-    router.push('/');
+    router.push('/play');
   };
 
   return (
