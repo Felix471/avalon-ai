@@ -4,19 +4,23 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { Button } from '@/components/ui/button';
 import { Loader2, ThumbsUp, ThumbsDown, Eye, EyeOff } from 'lucide-react';
-import { readAIResponse } from './aiResponse';
+import AISeatError from './AISeatError';
+import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function VotingPanel() {
   const {
     gameState,
     pendingVotes,
     addPendingVote,
+    addSystemEvent,
     revealAllVotes
   } = useGameStore();
 
   const [hasHumanVoted, setHasHumanVoted] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
   const [aiVotesStarted, setAiVotesStarted] = useState(false);
+  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
+  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -36,7 +40,13 @@ export default function VotingPanel() {
   const votesRevealed = Boolean(currentVotes && Object.keys(currentVotes).length > 0);
 
   const requestAIVote = async (playerId: number) => {
-    if (!gameState) return;
+    if (!gameState) return false;
+
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
 
     try {
       const response = await fetch('/api/ai', {
@@ -56,8 +66,13 @@ export default function VotingPanel() {
 
       addPendingVote(playerId, data.approve);
       await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+      return true;
     } catch (error) {
       console.error('AI Vote Error:', error);
+      const described = describeAIError(error);
+      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
+      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      return false;
     }
   };
 
@@ -72,7 +87,8 @@ export default function VotingPanel() {
         if (player.isHuman) continue;
         if (pendingVotes[player.id] !== undefined) continue;
 
-        await requestAIVote(player.id);
+        const succeeded = await requestAIVote(player.id);
+        if (!succeeded) break;
       }
     };
 
@@ -96,6 +112,25 @@ export default function VotingPanel() {
   const handleVote = (approve: boolean) => {
     addPendingVote(humanPlayerId, approve);
     setHasHumanVoted(true);
+  };
+
+  const handleRetryAIVote = async (playerId: number) => {
+    if (await requestAIVote(playerId)) {
+      setAiVotesStarted(false);
+    }
+  };
+
+  const handleSkipAIVote = (playerId: number) => {
+    const player = players.find(candidate => candidate.id === playerId);
+    const modelName = player?.aiModel?.name || 'AI';
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
+    addPendingVote(playerId, false);
+    addSystemEvent(`玩家${playerId}（${modelName}）投票已跳过，按反对计`);
+    setAiVotesStarted(false);
   };
 
   // 统计投票结果
@@ -227,6 +262,22 @@ export default function VotingPanel() {
           })}
         </div>
       </div>
+
+      {Object.keys(seatErrors).map(playerIdText => {
+        const playerId = Number(playerIdText);
+        const player = players.find(candidate => candidate.id === playerId);
+        return (
+          <div key={playerId} title={seatErrorTitles[playerId]}>
+            <AISeatError
+              playerId={playerId}
+              modelName={player?.aiModel?.name}
+              message={seatErrors[playerId]}
+              onRetry={() => void handleRetryAIVote(playerId)}
+              onSkip={() => handleSkipAIVote(playerId)}
+            />
+          </div>
+        );
+      })}
 
       {/* 亮票动画 */}
       {isRevealing && !votesRevealed && (

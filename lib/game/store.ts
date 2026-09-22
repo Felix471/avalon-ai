@@ -30,6 +30,7 @@ interface GameStore {
 
   // 玩家操作
   addDiscussion: (playerId: number, content: string) => void;
+  addSystemEvent: (content: string) => void;
   proposeTeam: (teamIds: number[]) => void;
 
   // 同时亮票相关
@@ -175,6 +176,12 @@ export const useGameStore = create<GameStore>()(
           })
         };
       }),
+
+      addSystemEvent: (content) => set(state => ({
+        gameState: state.gameState
+          ? addEvent(state.gameState, { type: 'system', content })
+          : null,
+      })),
 
       proposeTeam: (teamIds) => set(state => ({
         gameState: state.gameState ? proposeTeam(state.gameState, teamIds) : null,

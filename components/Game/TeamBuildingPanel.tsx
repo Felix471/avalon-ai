@@ -6,12 +6,16 @@ import { getCurrentLeader, isForcedTeamBuilding } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
-import { readAIResponse } from './aiResponse';
+import AISeatError from './AISeatError';
+import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function TeamBuildingPanel() {
-  const { gameState, proposeTeam } = useGameStore();
+  const { gameState, proposeTeam, addSystemEvent } = useGameStore();
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
   const [isAISelecting, setIsAISelecting] = useState(false);
+  const [humanOverride, setHumanOverride] = useState(false);
+  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
+  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -27,6 +31,11 @@ export default function TeamBuildingPanel() {
     if (!gameState) return;
 
     setIsAISelecting(true);
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
@@ -55,6 +64,9 @@ export default function TeamBuildingPanel() {
       proposeTeam(team);
     } catch (error) {
       console.error('AI Team Building Error:', error);
+      const described = describeAIError(error);
+      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
+      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
     } finally {
       setIsAISelecting(false);
     }
@@ -62,7 +74,7 @@ export default function TeamBuildingPanel() {
 
   // AI队长自动选队
   useEffect(() => {
-    if (!gameState || !leader || isHumanLeader || isAISelecting) return;
+    if (!gameState || !leader || isHumanLeader || humanOverride || isAISelecting || seatErrors[leader.id]) return;
 
     requestAITeam(leader.id);
   }, [isHumanLeader, leader?.id]);
@@ -83,8 +95,16 @@ export default function TeamBuildingPanel() {
     }
   };
 
+  const handleSkipAITeam = () => {
+    if (!leader) return;
+    const modelName = leader.aiModel?.name || 'AI';
+    setSeatErrors({});
+    setHumanOverride(true);
+    addSystemEvent(`队长 玩家${leader.id}（${modelName}）不可用，由你代为组队`);
+  };
+
   // AI队长界面
-  if (!isHumanLeader) {
+  if (!isHumanLeader && !humanOverride) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-white">🎯 组建队伍</h2>
@@ -96,15 +116,28 @@ export default function TeamBuildingPanel() {
           </div>
         )}
 
-        <div className="p-4 bg-slate-700/50 rounded-lg">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-            <div>
-              <p className="text-white font-medium">玩家{leader.id} 正在选择队伍...</p>
-              <p className="text-slate-400 text-sm">{leader.aiModel?.name || 'AI'}</p>
+        {seatErrors[leader.id] ? (
+          <div title={seatErrorTitles[leader.id]}>
+            <AISeatError
+              playerId={leader.id}
+              modelName={leader.aiModel?.name}
+              message={seatErrors[leader.id]}
+              onRetry={() => void requestAITeam(leader.id)}
+              onSkip={handleSkipAITeam}
+              skipLabel="由你组队"
+            />
+          </div>
+        ) : (
+          <div className="p-4 bg-slate-700/50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+              <div>
+                <p className="text-white font-medium">玩家{leader.id} 正在选择队伍...</p>
+                <p className="text-slate-400 text-sm">{leader.aiModel?.name || 'AI'}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="text-slate-400 text-sm text-center">
           需要选择 {requiredSize} 人执行任务

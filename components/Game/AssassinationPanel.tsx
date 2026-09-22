@@ -5,12 +5,16 @@ import { useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Target } from 'lucide-react';
-import { readAIResponse } from './aiResponse';
+import AISeatError from './AISeatError';
+import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function AssassinationPanel() {
-  const { gameState, assassinate } = useGameStore();
+  const { gameState, assassinate, addSystemEvent } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const [isAIAssassinating, setIsAIAssassinating] = useState(false);
+  const [humanOverride, setHumanOverride] = useState(false);
+  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
+  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
 
   const players = gameState?.players ?? [];
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
@@ -22,6 +26,11 @@ export default function AssassinationPanel() {
     if (!gameState) return;
 
     setIsAIAssassinating(true);
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
 
     try {
       const response = await fetch('/api/ai', {
@@ -47,6 +56,9 @@ export default function AssassinationPanel() {
       assassinate(data.targetId);
     } catch (error) {
       console.error('AI Assassination Error:', error);
+      const described = describeAIError(error);
+      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
+      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
     } finally {
       setIsAIAssassinating(false);
     }
@@ -54,7 +66,7 @@ export default function AssassinationPanel() {
 
   // AI刺客选择
   useEffect(() => {
-    if (!gameState || !assassin || isHumanAssassin) return;
+    if (!gameState || !assassin || isHumanAssassin || humanOverride || seatErrors[assassin.id]) return;
 
     const timer = setTimeout(() => requestAITarget(assassin.id), 1500);
     return () => clearTimeout(timer);
@@ -68,8 +80,16 @@ export default function AssassinationPanel() {
     }
   };
 
+  const handleSkipAITarget = () => {
+    if (!assassin) return;
+    const modelName = assassin.aiModel?.name || 'AI';
+    setSeatErrors({});
+    setHumanOverride(true);
+    addSystemEvent(`刺客（${modelName}）不可用，由你代为选择刺杀目标`);
+  };
+
   // AI刺客正在选择
-  if (!isHumanAssassin) {
+  if (!isHumanAssassin && !humanOverride) {
     return (
       <div className="text-center space-y-4">
         <h2 className="text-xl font-bold text-red-400">🗡️ 刺杀阶段</h2>
@@ -81,7 +101,18 @@ export default function AssassinationPanel() {
           <p className="text-slate-300 mt-2">
             但刺客 <span className="text-red-400">{assassin.name}</span> 有最后一次机会...
           </p>
-          {isAIAssassinating && (
+          {seatErrors[assassin.id] ? (
+            <div className="mt-4 text-left" title={seatErrorTitles[assassin.id]}>
+              <AISeatError
+                playerId={assassin.id}
+                modelName={assassin.aiModel?.name}
+                message={seatErrors[assassin.id]}
+                onRetry={() => void requestAITarget(assassin.id)}
+                onSkip={handleSkipAITarget}
+                skipLabel="由你选择"
+              />
+            </div>
+          ) : isAIAssassinating && (
             <div className="mt-4">
               <Loader2 className="w-8 h-8 animate-spin text-red-400 mx-auto mb-2" />
               <p className="text-slate-400">正在选择刺杀目标...</p>

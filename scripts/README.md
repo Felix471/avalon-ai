@@ -67,7 +67,7 @@ Games run with concurrency level 2 (`p-limit(2)`). LLM calls within a game are s
 
 ## Error Handling
 
-- LLM 429/503 → exponential backoff, then fallback response
-- Malformed LLM output → validator fallback (random vote, default action, canned speech)
+- Provider 429/5xx, timeout, or network failure → exponential backoff, then a neutral decision recorded in `providerFailures`
+- Malformed LLM output → validator fallback recorded in `fallbackCounts` (parser fallback counts only)
 - Game crash → logged to `data/failures.jsonl`, next game continues
-- Fallback usage tracked in each game's `fallbackCounts` field
+- `data/games.jsonl` was collected before `providerFailures` and the per-decision fallback fields existed, so historical rows do not contain them

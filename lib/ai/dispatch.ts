@@ -4,9 +4,22 @@
  * Extracted from app/api/ai/route.ts so both the API route and the
  * headless batch runner can share the same provider call logic.
  *
- * Includes exponential backoff for 429/503 responses (max 3 retries,
- * initial delay 2 seconds).
+ * Includes request timeouts and exponential backoff for transient failures.
  */
+
+export type AIProviderResult =
+  | { ok: true; text: string; latencyMs: number; attempts: number }
+  | { ok: false; error: string; status?: number; attempts: number; latencyMs: number };
+
+class ProviderError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly retryable = false,
+  ) {
+    super(message);
+  }
+}
 
 // ==================== Reasoning Model Detection ====================
 
@@ -16,10 +29,10 @@ const isReasoningModel = (model: string) =>
 
 // ==================== Provider Call Functions ====================
 
-async function callAnthropic(model: string, prompt: string): Promise<string> {
+async function callAnthropic(model: string, prompt: string, signal: AbortSignal): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
+    throw new ProviderError('missing_api_key');
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -34,22 +47,23 @@ async function callAnthropic(model: string, prompt: string): Promise<string> {
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Anthropic] API error:', response.status, errorText);
-    throw new ApiError(`Anthropic API error: ${response.status}`, response.status);
+    throw new ProviderError(`http_${response.status}`, response.status, isRetryableStatus(response.status));
   }
 
   const data = await response.json();
   return data.content?.[0]?.text || '';
 }
 
-async function callOpenAI(model: string, prompt: string): Promise<string> {
+async function callOpenAI(model: string, prompt: string, signal: AbortSignal): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error('OpenAI API key not configured (OPENAI_API_KEY)');
+    throw new ProviderError('missing_api_key');
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -63,22 +77,23 @@ async function callOpenAI(model: string, prompt: string): Promise<string> {
       ...(isReasoningModel(model) ? { max_completion_tokens: 300 } : { max_tokens: 300 }),
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[OpenAI] API error:', response.status, errorText);
-    throw new ApiError(`OpenAI API error: ${response.status}`, response.status);
+    throw new ProviderError(`http_${response.status}`, response.status, isRetryableStatus(response.status));
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
-async function callGoogle(model: string, prompt: string): Promise<string> {
+async function callGoogle(model: string, prompt: string, signal: AbortSignal): Promise<string> {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    throw new Error('Google API key not configured (GOOGLE_API_KEY)');
+    throw new ProviderError('missing_api_key');
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -116,20 +131,21 @@ async function callGoogle(model: string, prompt: string): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal,
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     console.error('[Google] API error:', response.status, data.error?.message);
-    throw new ApiError(`Google API error: ${response.status}`, response.status);
+    throw new ProviderError(`http_${response.status}`, response.status, isRetryableStatus(response.status));
   }
 
   const candidate = data.candidates?.[0];
 
   if (candidate?.finishReason === 'SAFETY') {
-    console.warn('[Google] Blocked by Safety Filter');
-    throw new Error('Response blocked by safety filter');
+    console.error('[Google] Response blocked by safety filter');
+    throw new ProviderError('safety_block');
   }
 
   let text = candidate?.content?.parts?.[0]?.text || '';
@@ -147,10 +163,10 @@ async function callGoogle(model: string, prompt: string): Promise<string> {
   return text;
 }
 
-async function callDeepSeek(model: string, prompt: string): Promise<string> {
+async function callDeepSeek(model: string, prompt: string, signal: AbortSignal): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    throw new Error('DeepSeek API key not configured (DEEPSEEK_API_KEY)');
+    throw new ProviderError('missing_api_key');
   }
 
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -164,22 +180,23 @@ async function callDeepSeek(model: string, prompt: string): Promise<string> {
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[DeepSeek] API error:', response.status, errorText);
-    throw new ApiError(`DeepSeek API error: ${response.status}`, response.status);
+    throw new ProviderError(`http_${response.status}`, response.status, isRetryableStatus(response.status));
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
-async function callXAI(model: string, prompt: string): Promise<string> {
+async function callXAI(model: string, prompt: string, signal: AbortSignal): Promise<string> {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
-    throw new Error('xAI API key not configured (XAI_API_KEY)');
+    throw new ProviderError('missing_api_key');
   }
 
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -193,59 +210,23 @@ async function callXAI(model: string, prompt: string): Promise<string> {
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[xAI] API error:', response.status, errorText);
-    throw new ApiError(`xAI API error: ${response.status}`, response.status);
+    throw new ProviderError(`http_${response.status}`, response.status, isRetryableStatus(response.status));
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
 }
 
-// ==================== Error Types ====================
-
-class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-// ==================== Fallback Responses ====================
-
-export function generateFallbackResponse(action: string): string {
-  switch (action) {
-    case 'discussion': {
-      const fallbackSpeeches = [
-        '我觉得我们需要更多信息才能判断。',
-        '这一轮很关键，大家要仔细考虑。',
-        '我暂时保留意见，先听听其他人怎么说。',
-        '目前的局势还不太明朗，我们要小心决策。',
-        '我在观察每个人的反应，希望能找到线索。',
-      ];
-      return fallbackSpeeches[Math.floor(Math.random() * fallbackSpeeches.length)];
-    }
-    case 'voting':
-      return Math.random() > 0.5 ? 'APPROVE' : 'REJECT';
-    case 'quest':
-      return 'SUCCESS';
-    case 'team_building':
-      return '';
-    case 'assassination':
-      return '';
-    default:
-      return '我需要再观察一下局势。';
-  }
-}
-
 // ==================== Retry Logic ====================
 
 function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 503;
+  return status === 429 || status >= 500;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -255,50 +236,103 @@ async function sleep(ms: number): Promise<void> {
 // ==================== Main Dispatcher ====================
 
 /**
- * Call an LLM provider with exponential backoff for 429/503 errors.
- * Max 3 retries, initial delay 2 seconds.
- * Falls back to generateFallbackResponse on exhaustion.
+ * Call an LLM provider with a 30-second timeout and transient-failure retries.
  */
 export async function callAIProvider(
   model: { provider: string; model: string; name?: string },
   prompt: string,
   action: string
-): Promise<string> {
+): Promise<AIProviderResult> {
   const MAX_RETRIES = 3;
   const INITIAL_DELAY_MS = 2000;
+  const REQUEST_TIMEOUT_MS = 30_000;
+  const startedAt = Date.now();
+  let attempts = 0;
+
+  void action;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    attempts = attempt + 1;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     try {
+      let text: string;
       switch (model.provider) {
         case 'anthropic':
-          return await callAnthropic(model.model, prompt);
+          text = await callAnthropic(model.model, prompt, controller.signal);
+          break;
         case 'openai':
-          return await callOpenAI(model.model, prompt);
+          text = await callOpenAI(model.model, prompt, controller.signal);
+          break;
         case 'google':
-          return await callGoogle(model.model, prompt);
+          text = await callGoogle(model.model, prompt, controller.signal);
+          break;
         case 'deepseek':
-          return await callDeepSeek(model.model, prompt);
+          text = await callDeepSeek(model.model, prompt, controller.signal);
+          break;
         case 'xai':
-          return await callXAI(model.model, prompt);
+          text = await callXAI(model.model, prompt, controller.signal);
+          break;
         default:
-          console.warn(`[AI_CALL] Unknown provider: ${model.provider}, using fallback`);
-          return generateFallbackResponse(action);
+          console.error(`[AI_CALL] Unknown provider: ${model.provider}`);
+          return {
+            ok: false,
+            error: 'unknown_provider',
+            attempts,
+            latencyMs: Date.now() - startedAt,
+          };
       }
+
+      if (!text.trim()) {
+        console.error(`[AI_CALL] Empty response from ${model.provider}`);
+        return {
+          ok: false,
+          error: 'empty_response',
+          attempts,
+          latencyMs: Date.now() - startedAt,
+        };
+      }
+
+      return { ok: true, text, attempts, latencyMs: Date.now() - startedAt };
     } catch (error) {
-      const isRetryable = error instanceof ApiError && isRetryableStatus(error.status);
+      const isAbort = error instanceof Error && error.name === 'AbortError';
+      const isProviderError = error instanceof ProviderError;
+      const isNetworkError = error instanceof TypeError;
+      const isRetryable = isAbort || isNetworkError || (isProviderError && error.retryable);
+      const errorCode = isAbort
+        ? 'timeout'
+        : isNetworkError
+          ? 'network_error'
+          : isProviderError
+            ? error.message
+            : 'provider_error';
+      const status = isProviderError ? error.status : undefined;
 
       if (isRetryable && attempt < MAX_RETRIES) {
         const delay = INITIAL_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`[AI_CALL] ${error.status} from ${model.provider}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`);
+        console.warn(`[AI_CALL] ${errorCode} from ${model.provider}; retrying in ${delay}ms`);
         await sleep(delay);
         continue;
       }
 
-      console.error(`[AI_CALL] Error from ${model.provider} (attempt ${attempt + 1}):`, error instanceof Error ? error.message : error);
-      return generateFallbackResponse(action);
+      console.error(`[AI_CALL] ${errorCode} from ${model.provider} after ${attempts} attempt(s)`);
+      return {
+        ok: false,
+        error: errorCode,
+        ...(status === undefined ? {} : { status }),
+        attempts,
+        latencyMs: Date.now() - startedAt,
+      };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
-  // Should not reach here, but just in case
-  return generateFallbackResponse(action);
+  return {
+    ok: false,
+    error: 'provider_error',
+    attempts,
+    latencyMs: Date.now() - startedAt,
+  };
 }

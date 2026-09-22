@@ -9,6 +9,8 @@
  * Outputs:
  *   data/games.jsonl    — one JSON line per completed game
  *   data/failures.jsonl — one JSON line per failed game
+ * Provider/transport failures are logged separately from parser fallbacks;
+ * neutral decisions keep a failed game simulation moving.
  */
 
 import * as dotenv from 'dotenv';
@@ -46,6 +48,8 @@ interface TeamProposal {
   team: number[];
   votes: Record<string, 'approve' | 'reject'>;
   accepted: boolean;
+  fallbackVotes?: number[];
+  fallback?: boolean;
 }
 
 interface QuestLog {
@@ -55,6 +59,7 @@ interface QuestLog {
   votes: Record<string, 'approve' | 'reject'>;
   actions: Record<string, 'success' | 'fail'>;
   result: 'success' | 'fail';
+  fallbackActions?: number[];
 }
 
 interface DiscussionLog {
@@ -63,14 +68,27 @@ interface DiscussionLog {
   speakerId: number;
   content: string;
   timestamp: string;
+  fallback?: boolean;
 }
 
+/** Parser fallback counts for unparseable model output. */
 interface FallbackCounts {
   voting: number;
   quest: number;
   discussion: number;
   teamBuilding: number;
   assassination: number;
+}
+
+/** Provider or transport failures after retries are exhausted. */
+interface ProviderFailure {
+  provider: string;
+  model: string;
+  action: string;
+  playerId: number;
+  questRound: number;
+  error: string;
+  status?: number;
 }
 
 interface GameLog {
@@ -86,12 +104,14 @@ interface GameLog {
     target: number;
     merlinId: number;
     correct: boolean;
+    fallback?: boolean;
   } | null;
   winner: 'good' | 'evil';
   winReason: string;
   llmCallCount: number;
   durationMs: number;
   fallbackCounts: FallbackCounts;
+  providerFailures: ProviderFailure[];
 }
 
 // ==================== CLI Parsing ====================
@@ -256,8 +276,11 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
   const fallbackCounts: FallbackCounts = {
     voting: 0, quest: 0, discussion: 0, teamBuilding: 0, assassination: 0,
   };
+  const providerFailures: ProviderFailure[] = [];
   const proposalIndexPerQuest: Record<number, number> = {};
   let recentSpeeches: Array<{ playerId: number; content: string }> = [];
+  let pendingTeamProviderFallback = false;
+  let assassinationProviderFallback = false;
 
   const mode: PromptMode = config.promptMode;
 
@@ -287,10 +310,26 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
           const speakers = getSpeakerOrder(state);
           for (const player of speakers) {
             const prompt = buildDiscussionPrompt(state, player.id, recentSpeeches, mode);
-            const response = await callAIProvider(player.aiModel!, prompt, 'discussion');
-            const validated = validateDiscussionOutput(response);
-            const speech = validated.cleanedOutput;
-            if (!validated.isValid) fallbackCounts.discussion++;
+            const result = await callAIProvider(player.aiModel!, prompt, 'discussion');
+            let speech: string;
+            let providerFallback = false;
+            if (!result.ok) {
+              providerFailures.push({
+                provider: player.aiModel!.provider,
+                model: player.aiModel!.model,
+                action: 'discussion',
+                playerId: player.id,
+                questRound: state.currentQuest,
+                error: result.error,
+                ...(result.status === undefined ? {} : { status: result.status }),
+              });
+              speech = '';
+              providerFallback = true;
+            } else {
+              const validated = validateDiscussionOutput(result.text);
+              speech = validated.cleanedOutput;
+              if (!validated.isValid) fallbackCounts.discussion++;
+            }
 
             state = addEvent(state, {
               type: 'discussion',
@@ -306,6 +345,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
               speakerId: player.id,
               content: speech,
               timestamp: new Date().toISOString(),
+              ...(providerFallback ? { fallback: true } : {}),
             });
             llmCallCount++;
           }
@@ -321,9 +361,25 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'team_building': {
         const leader = getCurrentLeader(state);
         const prompt = buildTeamBuildingPrompt(state, leader.id);
-        const response = await callAIProvider(leader.aiModel!, prompt, 'team_building');
-        const { team, wasFallback } = parseAndValidateTeam(response, state, leader.id);
-        if (wasFallback) fallbackCounts.teamBuilding++;
+        const result = await callAIProvider(leader.aiModel!, prompt, 'team_building');
+        let team: number[];
+        pendingTeamProviderFallback = !result.ok;
+        if (!result.ok) {
+          providerFailures.push({
+            provider: leader.aiModel!.provider,
+            model: leader.aiModel!.model,
+            action: 'team_building',
+            playerId: leader.id,
+            questRound: state.currentQuest,
+            error: result.error,
+            ...(result.status === undefined ? {} : { status: result.status }),
+          });
+          team = parseAndValidateTeam('', state, leader.id).team;
+        } else {
+          const parsed = parseAndValidateTeam(result.text, state, leader.id);
+          team = parsed.team;
+          if (parsed.wasFallback) fallbackCounts.teamBuilding++;
+        }
         llmCallCount++;
 
         const questRound = state.currentQuest;
@@ -343,7 +399,9 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
             team: proposedTeam,
             votes: {},
             accepted: true,
+            ...(pendingTeamProviderFallback ? { fallback: true } : {}),
           });
+          pendingTeamProviderFallback = false;
         }
         // Otherwise phase is 'team_vote', handled in next iteration
         break;
@@ -356,13 +414,29 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
         const snapshotProposedBy = state.players[state.currentLeaderIndex].id;
 
         const votesRecord: Record<string, 'approve' | 'reject'> = {};
+        const fallbackVotes: number[] = [];
 
         for (const player of state.players) {
           const prompt = buildVotingPrompt(state, player.id, state.currentProposedTeam || [], mode);
-          const response = await callAIProvider(player.aiModel!, prompt, 'voting');
-          const validated = validateVotingOutput(response);
-          const approve = validated.vote ?? (Math.random() > 0.5);
-          if (validated.vote === null) fallbackCounts.voting++;
+          const result = await callAIProvider(player.aiModel!, prompt, 'voting');
+          let approve: boolean;
+          if (!result.ok) {
+            providerFailures.push({
+              provider: player.aiModel!.provider,
+              model: player.aiModel!.model,
+              action: 'voting',
+              playerId: player.id,
+              questRound: state.currentQuest,
+              error: result.error,
+              ...(result.status === undefined ? {} : { status: result.status }),
+            });
+            approve = false;
+            fallbackVotes.push(player.id);
+          } else {
+            const validated = validateVotingOutput(result.text);
+            approve = validated.vote ?? (Math.random() > 0.5);
+            if (validated.vote === null) fallbackCounts.voting++;
+          }
 
           votesRecord[String(player.id)] = approve ? 'approve' : 'reject';
           llmCallCount++;
@@ -379,7 +453,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
           team: snapshotProposedTeam,
           votes: votesRecord,
           accepted,
+          ...(fallbackVotes.length ? { fallbackVotes } : {}),
+          ...(pendingTeamProviderFallback ? { fallback: true } : {}),
         });
+        pendingTeamProviderFallback = false;
 
         // state.phase already set by resolveVote (quest/discussion/team_building/game_over)
         break;
@@ -400,6 +477,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
         }
 
         const actionsRecord: Record<string, 'success' | 'fail'> = {};
+        const fallbackActions: number[] = [];
 
         for (const playerId of teamMemberIds) {
           const player = state.players.find(p => p.id === playerId)!;
@@ -410,13 +488,29 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
             state = submitQuestAction(state, playerId, true);
           } else {
             const prompt = buildQuestActionPrompt(state, playerId, mode);
-            const response = await callAIProvider(player.aiModel!, prompt, 'quest');
-            const validated = validateQuestActionOutput(response, isEvil);
-            if (!validated.isValid) fallbackCounts.quest++;
+            const result = await callAIProvider(player.aiModel!, prompt, 'quest');
+            let success: boolean;
+            if (!result.ok) {
+              providerFailures.push({
+                provider: player.aiModel!.provider,
+                model: player.aiModel!.model,
+                action: 'quest',
+                playerId,
+                questRound: state.currentQuest,
+                error: result.error,
+                ...(result.status === undefined ? {} : { status: result.status }),
+              });
+              success = true;
+              fallbackActions.push(playerId);
+            } else {
+              const validated = validateQuestActionOutput(result.text, isEvil);
+              success = validated.success;
+              if (!validated.isValid) fallbackCounts.quest++;
+            }
             llmCallCount++;
 
-            actionsRecord[String(playerId)] = validated.success ? 'success' : 'fail';
-            state = submitQuestAction(state, playerId, validated.success);
+            actionsRecord[String(playerId)] = success ? 'success' : 'fail';
+            state = submitQuestAction(state, playerId, success);
           }
         }
 
@@ -435,6 +529,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
           votes: questVotesRecord,
           actions: actionsRecord,
           result: finishedQuest.result === 'success' ? 'success' : 'fail',
+          ...(fallbackActions.length ? { fallbackActions } : {}),
         });
         break;
       }
@@ -442,9 +537,25 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'assassination': {
         const assassin = state.players.find(p => p.role === 'assassin')!;
         const prompt = buildAssassinationPrompt(state, assassin.id, mode);
-        const response = await callAIProvider(assassin.aiModel!, prompt, 'assassination');
-        const { targetId, wasFallback } = parseTargetId(response, state);
-        if (wasFallback) fallbackCounts.assassination++;
+        const result = await callAIProvider(assassin.aiModel!, prompt, 'assassination');
+        let targetId: number;
+        assassinationProviderFallback = !result.ok;
+        if (!result.ok) {
+          providerFailures.push({
+            provider: assassin.aiModel!.provider,
+            model: assassin.aiModel!.model,
+            action: 'assassination',
+            playerId: assassin.id,
+            questRound: state.currentQuest,
+            error: result.error,
+            ...(result.status === undefined ? {} : { status: result.status }),
+          });
+          targetId = parseTargetId('', state).targetId;
+        } else {
+          const parsed = parseTargetId(result.text, state);
+          targetId = parsed.targetId;
+          if (parsed.wasFallback) fallbackCounts.assassination++;
+        }
         llmCallCount++;
 
         state = attemptAssassination(state, targetId);
@@ -477,6 +588,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
     target: state.assassinationTarget,
     merlinId: merlin.id,
     correct: state.players.find(p => p.id === state.assassinationTarget)?.role === 'merlin',
+    ...(assassinationProviderFallback ? { fallback: true } : {}),
   } : null;
 
   const log: GameLog = {
@@ -498,6 +610,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
     llmCallCount,
     durationMs: Date.now() - startTime,
     fallbackCounts,
+    providerFailures,
   };
 
   return log;

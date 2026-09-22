@@ -6,11 +6,16 @@ import { isPlayerOnCurrentTeam, hasPlayerActed, getQuestTeamMembers } from '@/li
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { readAIResponse } from './aiResponse';
+import AISeatError from './AISeatError';
+import { describeAIError, readAIResponse } from './aiResponse';
 
 export default function QuestPanel() {
-  const { gameState, questAction } = useGameStore();
+  const { gameState, questAction, addSystemEvent } = useGameStore();
   const [aiActionsSubmitted, setAiActionsSubmitted] = useState<Set<number>>(new Set());
+  const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
+  const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   const humanPlayerId = gameState?.humanPlayerId ?? -1;
   const currentQuest = gameState?.currentQuest ?? 0;
@@ -22,7 +27,14 @@ export default function QuestPanel() {
   const humanIsEvil = humanPlayer?.role ? ROLES[humanPlayer.role].team === 'evil' : false;
 
   const requestAIQuestAction = async (playerId: number) => {
-    if (!gameState) return;
+    if (!gameState) return false;
+
+    setIsProcessingAI(true);
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
 
     try {
       const member = gameState.players.find(player => player.id === playerId);
@@ -54,33 +66,62 @@ export default function QuestPanel() {
       await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
       questAction(playerId, success);
       setAiActionsSubmitted(prev => new Set([...prev, playerId]));
+      return true;
     } catch (error) {
       console.error('AI Quest Error:', error);
+      const described = describeAIError(error);
+      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
+      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      return false;
+    } finally {
+      setIsProcessingAI(false);
     }
   };
 
   // AI执行任务
   useEffect(() => {
-    if (!gameState) return;
+    if (!gameState || isProcessingAI) return;
 
     const submitAIActions = async () => {
       for (const member of teamMembers) {
         if (member.isHuman) continue;
         if (aiActionsSubmitted.has(member.id)) continue;
         if (hasPlayerActed(gameState, member.id)) continue;
+        if (seatErrors[member.id]) break;
 
-        await requestAIQuestAction(member.id);
+        const succeeded = await requestAIQuestAction(member.id);
+        if (!succeeded) break;
       }
     };
 
     const timer = setTimeout(submitAIActions, 800);
     return () => clearTimeout(timer);
-  }, [teamMembers.length, gameState?.phase]);
+  }, [teamMembers.length, gameState?.phase, retryVersion]);
 
   if (!gameState || !quest || !humanPlayer) return null;
 
   const handleAction = (success: boolean) => {
     questAction(humanPlayerId, success);
+  };
+
+  const handleRetryAIQuestAction = async (playerId: number) => {
+    if (await requestAIQuestAction(playerId)) {
+      setRetryVersion(version => version + 1);
+    }
+  };
+
+  const handleSkipAIQuestAction = (playerId: number) => {
+    const player = teamMembers.find(candidate => candidate.id === playerId);
+    const modelName = player?.aiModel?.name || 'AI';
+    setSeatErrors(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
+    questAction(playerId, true);
+    setAiActionsSubmitted(prev => new Set([...prev, playerId]));
+    addSystemEvent(`玩家${playerId}（${modelName}）任务行动已跳过，按成功计`);
+    setRetryVersion(version => version + 1);
   };
 
   // 统计已行动人数
@@ -168,6 +209,22 @@ export default function QuestPanel() {
           你不在本次任务队伍中，等待结果...
         </div>
       )}
+
+      {Object.keys(seatErrors).map(playerIdText => {
+        const playerId = Number(playerIdText);
+        const player = teamMembers.find(candidate => candidate.id === playerId);
+        return (
+          <div key={playerId} title={seatErrorTitles[playerId]}>
+            <AISeatError
+              playerId={playerId}
+              modelName={player?.aiModel?.name}
+              message={seatErrors[playerId]}
+              onRetry={() => void handleRetryAIQuestAction(playerId)}
+              onSkip={() => handleSkipAIQuestAction(playerId)}
+            />
+          </div>
+        );
+      })}
 
       {/* 进度 */}
       <div className="space-y-2">

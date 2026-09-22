@@ -158,16 +158,10 @@ function parseVerdict(raw: string): Verdict | null {
   }
 }
 
-// Canned strings dispatch.ts returns when the API errored out — must not be
-// mistaken for a judge reply (they never contain "verdict", but be explicit).
-function looksLikeFallback(raw: string): boolean {
-  return !raw.includes('verdict');
-}
-
 async function judgeSpeech(speech: Speech): Promise<Verdict | null> {
-  const raw = await callAIProvider(JUDGE_MODEL, buildJudgePrompt(speech), 'selfrec_annotation');
-  if (looksLikeFallback(raw)) return null;
-  return parseVerdict(raw);
+  const result = await callAIProvider(JUDGE_MODEL, buildJudgePrompt(speech), 'selfrec_annotation');
+  if (!result.ok) return null;
+  return parseVerdict(result.text);
 }
 
 // ==================== Annotation runner ====================
