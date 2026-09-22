@@ -1,6 +1,7 @@
 // API route for validated AI actions in the web game.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { parseAIRequest, type AIRequest } from '@/lib/api/aiRequestSchema';
 import { GameState, ROLES } from '@/lib/game/types';
 import { validateSpeechInput, wrapUserInputForAI } from '@/lib/security/inputValidator';
 import {
@@ -20,15 +21,6 @@ import { checkRateLimit, getClientId } from '@/lib/security/rateLimiter';
 import { AIProviderResult, callAIProvider } from '@/lib/ai/dispatch';
 
 // ==================== 类型定义 ====================
-
-interface AIRequest {
-  gameState: GameState;
-  playerId: number;
-  action: 'discussion' | 'voting' | 'quest' | 'team_building' | 'assassination';
-  recentSpeeches?: Array<{ playerId: number; content: string }>;
-  humanInput?: string;
-  promptMode?: 'full' | 'naive';
-}
 
 type AIModelRef = { provider: string; model: string };
 
@@ -63,7 +55,22 @@ function unparseableResponse(model: AIModelRef, raw: string, reason?: string) {
 export async function POST(request: NextRequest) {
   try {
     const clientId = getClientId(request);
-    const body: AIRequest = await request.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+    }
+
+    const parsedRequest = parseAIRequest(rawBody);
+    if (!parsedRequest.ok) {
+      return NextResponse.json(
+        { error: 'invalid_request', issues: parsedRequest.issues },
+        { status: 400 },
+      );
+    }
+
+    const body: AIRequest = parsedRequest.data;
 
     // 速率限制检查
     const rateCheck = checkRateLimit(clientId, body.action);
@@ -82,23 +89,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const {
-      gameState,
-      playerId,
-      action,
-      recentSpeeches,
-      humanInput,
-      promptMode = 'full',
-    } = body;
-
-    if (!gameState || !playerId || !action) {
-      return NextResponse.json({ error: '请求参数不完整' }, { status: 400 });
-    }
-
-    const player = gameState.players.find(p => p.id === playerId);
-    if (!player) {
-      return NextResponse.json({ error: '无效的玩家ID' }, { status: 400 });
-    }
+    const { playerId, action, recentSpeeches, humanInput, promptMode = 'full' } = body;
+    // Zod validates the serialized shape; this cast bridges JSON record keys to GameState's numeric keys.
+    const gameState = body.gameState as GameState;
 
     if (humanInput) {
       const inputValidation = validateSpeechInput(humanInput);
