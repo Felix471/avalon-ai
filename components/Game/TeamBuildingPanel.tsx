@@ -6,57 +6,68 @@ import { getCurrentLeader, isForcedTeamBuilding } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { readAIResponse } from './aiResponse';
 
 export default function TeamBuildingPanel() {
   const { gameState, proposeTeam } = useGameStore();
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
   const [isAISelecting, setIsAISelecting] = useState(false);
 
-  if (!gameState) return null;
+  const players = gameState?.players ?? [];
+  const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const currentQuest = gameState?.currentQuest ?? 0;
+  const consecutiveRejects = gameState?.consecutiveRejects ?? 0;
+  const leader = gameState ? getCurrentLeader(gameState) : null;
+  const quest = gameState?.quests[currentQuest - 1];
+  const requiredSize = quest?.requiredPlayers ?? 0;
+  const isHumanLeader = leader?.id === humanPlayerId;
+  const isForced = gameState ? isForcedTeamBuilding(gameState) : false;
 
-  const { players, humanPlayerId, currentQuest, consecutiveRejects } = gameState;
-  const leader = getCurrentLeader(gameState);
-  const quest = gameState.quests[currentQuest - 1];
-  const requiredSize = quest.requiredPlayers;
-  const isHumanLeader = leader.id === humanPlayerId;
-  const isForced = isForcedTeamBuilding(gameState);
+  const requestAITeam = async (playerId: number) => {
+    if (!gameState) return;
+
+    setIsAISelecting(true);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameState,
+          playerId,
+          action: 'team_building',
+          requiredSize,
+        }),
+      });
+      const data = await readAIResponse(response);
+      const validPlayerIds = new Set(players.map(player => player.id));
+      const team = data.team;
+
+      if (
+        !Array.isArray(team)
+        || team.length !== requiredSize
+        || !team.every(id => Number.isInteger(id) && validPlayerIds.has(id))
+        || new Set(team).size !== team.length
+      ) {
+        throw new Error(`AI team response must contain ${requiredSize} unique valid player ids`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      proposeTeam(team);
+    } catch (error) {
+      console.error('AI Team Building Error:', error);
+    } finally {
+      setIsAISelecting(false);
+    }
+  };
 
   // AI队长自动选队
   useEffect(() => {
-    if (isHumanLeader || isAISelecting) return;
+    if (!gameState || !leader || isHumanLeader || isAISelecting) return;
 
-    const aiSelectTeam = async () => {
-      setIsAISelecting(true);
-      try {
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gameState,
-            playerId: leader.id,
-            action: 'team_building',
-            requiredSize,
-          }),
-        });
-        const data = await response.json();
-        const team = data.team as number[];
+    requestAITeam(leader.id);
+  }, [isHumanLeader, leader?.id]);
 
-        // 延迟一下再提交，让用户能看到
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        proposeTeam(team);
-      } catch (error) {
-        console.error('AI Team Building Error:', error);
-        // Fallback: 随机选
-        const shuffled = [...players].sort(() => Math.random() - 0.5);
-        const team = shuffled.slice(0, requiredSize).map(p => p.id);
-        proposeTeam(team);
-      } finally {
-        setIsAISelecting(false);
-      }
-    };
-
-    aiSelectTeam();
-  }, [isHumanLeader, leader.id]);
+  if (!gameState || !leader || !quest) return null;
 
   const togglePlayer = (playerId: number) => {
     if (selectedPlayers.includes(playerId)) {

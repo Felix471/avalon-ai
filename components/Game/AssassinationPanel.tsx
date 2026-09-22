@@ -5,54 +5,62 @@ import { useGameStore } from '@/lib/game/store';
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, Target } from 'lucide-react';
+import { readAIResponse } from './aiResponse';
 
 export default function AssassinationPanel() {
   const { gameState, assassinate } = useGameStore();
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
   const [isAIAssassinating, setIsAIAssassinating] = useState(false);
 
-  if (!gameState) return null;
+  const players = gameState?.players ?? [];
+  const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const assassin = players.find(p => p.role === 'assassin');
+  const isHumanAssassin = assassin?.id === humanPlayerId;
+  const goodPlayers = players.filter(p => p.role && ROLES[p.role].team === 'good');
 
-  const { players, humanPlayerId } = gameState;
-  const assassin = players.find(p => p.role === 'assassin')!;
-  const isHumanAssassin = assassin.id === humanPlayerId;
-  const goodPlayers = players.filter(p => ROLES[p.role!].team === 'good');
+  const requestAITarget = async (playerId: number) => {
+    if (!gameState) return;
+
+    setIsAIAssassinating(true);
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameState,
+          playerId,
+          action: 'assassination',
+        }),
+      });
+
+      const data = await readAIResponse(response);
+      if (
+        typeof data.targetId !== 'number'
+        || !Number.isInteger(data.targetId)
+        || !goodPlayers.some(player => player.id === data.targetId)
+      ) {
+        throw new Error('AI assassination response must target a good player');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      assassinate(data.targetId);
+    } catch (error) {
+      console.error('AI Assassination Error:', error);
+    } finally {
+      setIsAIAssassinating(false);
+    }
+  };
 
   // AI刺客选择
   useEffect(() => {
-    if (isHumanAssassin) return;
+    if (!gameState || !assassin || isHumanAssassin) return;
 
-    const aiAssassinate = async () => {
-      setIsAIAssassinating(true);
-
-      try {
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gameState,
-            playerId: assassin.id,
-            action: 'assassination',
-          }),
-        });
-
-        const data = await response.json();
-        const targetId = data.targetId || goodPlayers[0].id;
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        assassinate(targetId);
-      } catch (error) {
-        console.error('AI Assassination Error:', error);
-        const randomTarget = goodPlayers[Math.floor(Math.random() * goodPlayers.length)];
-        assassinate(randomTarget.id);
-      } finally {
-        setIsAIAssassinating(false);
-      }
-    };
-
-    const timer = setTimeout(aiAssassinate, 1500);
+    const timer = setTimeout(() => requestAITarget(assassin.id), 1500);
     return () => clearTimeout(timer);
-  }, [isHumanAssassin]);
+  }, [isHumanAssassin, assassin?.id]);
+
+  if (!gameState || !assassin) return null;
 
   const handleAssassinate = () => {
     if (selectedTarget) {

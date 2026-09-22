@@ -6,59 +6,78 @@ import { isPlayerOnCurrentTeam, hasPlayerActed, getQuestTeamMembers } from '@/li
 import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { readAIResponse } from './aiResponse';
 
 export default function QuestPanel() {
   const { gameState, questAction } = useGameStore();
   const [aiActionsSubmitted, setAiActionsSubmitted] = useState<Set<number>>(new Set());
 
-  if (!gameState) return null;
+  const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const currentQuest = gameState?.currentQuest ?? 0;
+  const quest = gameState?.quests[currentQuest - 1];
+  const teamMembers = gameState ? getQuestTeamMembers(gameState) : [];
+  const humanOnTeam = gameState ? isPlayerOnCurrentTeam(gameState, humanPlayerId) : false;
+  const humanHasActed = gameState ? hasPlayerActed(gameState, humanPlayerId) : false;
+  const humanPlayer = gameState?.players.find(p => p.id === humanPlayerId);
+  const humanIsEvil = humanPlayer?.role ? ROLES[humanPlayer.role].team === 'evil' : false;
 
-  const { humanPlayerId, quests, currentQuest } = gameState;
-  const quest = quests[currentQuest - 1];
-  const teamMembers = getQuestTeamMembers(gameState);
-  const humanOnTeam = isPlayerOnCurrentTeam(gameState, humanPlayerId);
-  const humanHasActed = hasPlayerActed(gameState, humanPlayerId);
-  const humanPlayer = gameState.players.find(p => p.id === humanPlayerId)!;
-  const humanIsEvil = ROLES[humanPlayer.role!].team === 'evil';
+  const requestAIQuestAction = async (playerId: number) => {
+    if (!gameState) return;
+
+    try {
+      const member = gameState.players.find(player => player.id === playerId);
+      if (!member?.role) {
+        throw new Error(`Quest player ${playerId} does not have a valid role`);
+      }
+
+      const isEvil = ROLES[member.role].team === 'evil';
+      let success = true;
+
+      if (isEvil) {
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameState,
+            playerId,
+            action: 'quest',
+          }),
+        });
+
+        const data = await readAIResponse(response);
+        if (typeof data.success !== 'boolean') {
+          throw new Error('AI quest response must include success as a boolean');
+        }
+        success = data.success;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+      questAction(playerId, success);
+      setAiActionsSubmitted(prev => new Set([...prev, playerId]));
+    } catch (error) {
+      console.error('AI Quest Error:', error);
+    }
+  };
 
   // AI执行任务
   useEffect(() => {
+    if (!gameState) return;
+
     const submitAIActions = async () => {
       for (const member of teamMembers) {
         if (member.isHuman) continue;
         if (aiActionsSubmitted.has(member.id)) continue;
         if (hasPlayerActed(gameState, member.id)) continue;
 
-        try {
-          const response = await fetch('/api/ai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              gameState,
-              playerId: member.id,
-              action: 'quest',
-            }),
-          });
-
-          const data = await response.json();
-          const isEvil = ROLES[member.role!].team === 'evil';
-          // 好人必须成功，坏人根据AI决定
-          const success = isEvil ? (data.success ?? true) : true;
-
-          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
-          questAction(member.id, success);
-          setAiActionsSubmitted(prev => new Set([...prev, member.id]));
-        } catch (error) {
-          console.error('AI Quest Error:', error);
-          questAction(member.id, true); // fallback: 成功
-          setAiActionsSubmitted(prev => new Set([...prev, member.id]));
-        }
+        await requestAIQuestAction(member.id);
       }
     };
 
     const timer = setTimeout(submitAIActions, 800);
     return () => clearTimeout(timer);
   }, [teamMembers.length, gameState?.phase]);
+
+  if (!gameState || !quest || !humanPlayer) return null;
 
   const handleAction = (success: boolean) => {
     questAction(humanPlayerId, success);

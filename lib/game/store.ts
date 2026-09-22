@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import {
   GameState, GameConfig, GamePhase, AI_MODELS, VariantRules
 } from './types';
@@ -274,24 +274,9 @@ export const useGameStore = create<GameStore>()(
 
 // ============ React Hook：等待 Hydration ============
 export function useHydration() {
-  const [hydrated, setHydratedState] = useState(hasHydrated);
-
-  useEffect(() => {
-    // 如果已经 hydrated，直接返回 true
-    if (hasHydrated) {
-      setHydratedState(true);
-      return;
-    }
-
-    // 否则订阅完成事件
-    const unsubscribe = onHydrationComplete(() => {
-      setHydratedState(true);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  return hydrated;
+  return useSyncExternalStore(
+    onHydrationComplete,
+    getHasHydrated,
+    () => false
+  );
 }

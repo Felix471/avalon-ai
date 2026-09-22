@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { getCurrentLeader } from '@/lib/game/engine';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import {
   quickSuspicionCheck,
   MAX_SPEECH_LENGTH
 } from '@/lib/security/inputValidator';
+import { readAIResponse } from './aiResponse';
 
 // ==================== 安全输入组件（内联） ====================
 
@@ -143,18 +144,24 @@ export default function DiscussionPanel() {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [currentSpeakerIndex, setCurrentSpeakerIndex] = useState(0);
   const [aiResponses, setAiResponses] = useState<Map<number, string>>(new Map());
+  const requestedSpeakerRef = useRef<number | null>(null);
 
   // 重置状态（当进入新的发言阶段时）
   useEffect(() => {
+    if (!gameState) return;
+
     setHasHumanSpoken(false);
     setCurrentSpeakerIndex(0);
     setAiResponses(new Map());
+    requestedSpeakerRef.current = null;
   }, [gameState?.currentQuest, gameState?.consecutiveRejects]);
 
-  if (!gameState) return null;
-
-  const { players, humanPlayerId, currentLeaderIndex, consecutiveRejects, currentQuest } = gameState;
-  const leader = getCurrentLeader(gameState);
+  const players = gameState?.players ?? [];
+  const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const currentLeaderIndex = gameState?.currentLeaderIndex ?? 0;
+  const consecutiveRejects = gameState?.consecutiveRejects ?? 0;
+  const currentQuest = gameState?.currentQuest ?? 0;
+  const leader = gameState ? getCurrentLeader(gameState) : null;
 
   // 发言顺序：从队长开始，顺时针
   const speakingOrder = [
@@ -180,58 +187,56 @@ export default function DiscussionPanel() {
     return speeches;
   };
 
+  const requestAISpeech = async (playerId: number) => {
+    if (!gameState) return;
+
+    setIsProcessingAI(true);
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameState,
+          playerId,
+          action: 'discussion',
+          recentSpeeches: getRecentSpeeches(),
+        }),
+      });
+
+      const data = await readAIResponse(response);
+      if (typeof data.speech !== 'string') {
+        throw new Error('AI discussion response must include speech as a string');
+      }
+      const speech = data.speech;
+
+      setAiResponses(prev => new Map(prev).set(playerId, speech));
+      addDiscussion(playerId, speech);
+
+      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+      setCurrentSpeakerIndex(prev => prev + 1);
+    } catch (error) {
+      console.error('AI 发言错误:', error);
+    } finally {
+      setIsProcessingAI(false);
+    }
+  };
+
   // AI 自动发言
   useEffect(() => {
+    if (!gameState) return;
     if (allSpoken || isHumanTurn || isProcessingAI) return;
     if (!currentSpeaker) return;
+    if (requestedSpeakerRef.current === currentSpeaker.id) return;
 
-    const processAISpeech = async () => {
-      setIsProcessingAI(true);
-
-      try {
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gameState,
-            playerId: currentSpeaker.id,
-            action: 'discussion',
-            recentSpeeches: getRecentSpeeches(),
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('API 请求失败');
-        }
-
-        const data = await response.json();
-        const speech = data.speech || '我需要再观察一下局势。';
-
-        // 记录 AI 发言
-        setAiResponses(prev => new Map(prev).set(currentSpeaker.id, speech));
-        addDiscussion(currentSpeaker.id, speech);
-
-        // 添加一点延迟，让发言看起来更自然
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-
-        // 移动到下一个发言者
-        setCurrentSpeakerIndex(prev => prev + 1);
-      } catch (error) {
-        console.error('AI 发言错误:', error);
-        // 使用默认发言
-        const fallbackSpeech = '让我们仔细分析一下当前的局势。';
-        setAiResponses(prev => new Map(prev).set(currentSpeaker.id, fallbackSpeech));
-        addDiscussion(currentSpeaker.id, fallbackSpeech);
-        setCurrentSpeakerIndex(prev => prev + 1);
-      } finally {
-        setIsProcessingAI(false);
-      }
-    };
+    requestedSpeakerRef.current = currentSpeaker.id;
 
     // 延迟一下开始，避免过于突兀
-    const timer = setTimeout(processAISpeech, 500);
+    const timer = setTimeout(() => requestAISpeech(currentSpeaker.id), 500);
     return () => clearTimeout(timer);
   }, [currentSpeakerIndex, isHumanTurn, allSpoken, isProcessingAI]);
+
+  if (!gameState || !leader) return null;
 
   // 人类发言提交
   const handleHumanSpeech = (content: string) => {

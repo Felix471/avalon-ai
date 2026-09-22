@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { Button } from '@/components/ui/button';
 import { Loader2, ThumbsUp, ThumbsDown, Eye, EyeOff } from 'lucide-react';
+import { readAIResponse } from './aiResponse';
 
 export default function VotingPanel() {
   const {
@@ -17,9 +18,12 @@ export default function VotingPanel() {
   const [isRevealing, setIsRevealing] = useState(false);
   const [aiVotesStarted, setAiVotesStarted] = useState(false);
 
-  if (!gameState) return null;
-
-  const { players, humanPlayerId, currentProposedTeam, currentVotes, consecutiveRejects, currentQuest } = gameState;
+  const players = gameState?.players ?? [];
+  const humanPlayerId = gameState?.humanPlayerId ?? -1;
+  const currentProposedTeam = gameState?.currentProposedTeam;
+  const currentVotes = gameState?.currentVotes;
+  const consecutiveRejects = gameState?.consecutiveRejects ?? 0;
+  const currentQuest = gameState?.currentQuest ?? 0;
   const teamPlayers = currentProposedTeam?.map(id => players.find(p => p.id === id)!) || [];
 
   // 人类玩家是否在本次提议的队伍中
@@ -29,11 +33,37 @@ export default function VotingPanel() {
   const allVotesCollected = Object.keys(pendingVotes).length === players.length;
 
   // 如果已经有 currentVotes，说明已经 reveal 了
-  const votesRevealed = currentVotes && Object.keys(currentVotes).length > 0;
+  const votesRevealed = Boolean(currentVotes && Object.keys(currentVotes).length > 0);
+
+  const requestAIVote = async (playerId: number) => {
+    if (!gameState) return;
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameState,
+          playerId,
+          action: 'voting',
+        }),
+      });
+
+      const data = await readAIResponse(response);
+      if (typeof data.approve !== 'boolean') {
+        throw new Error('AI voting response must include approve as a boolean');
+      }
+
+      addPendingVote(playerId, data.approve);
+      await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+    } catch (error) {
+      console.error('AI Vote Error:', error);
+    }
+  };
 
   // AI投票逻辑
   useEffect(() => {
-    if (!hasHumanVoted || aiVotesStarted || allVotesCollected) return;
+    if (!gameState || !hasHumanVoted || aiVotesStarted || allVotesCollected) return;
 
     setAiVotesStarted(true);
 
@@ -42,26 +72,7 @@ export default function VotingPanel() {
         if (player.isHuman) continue;
         if (pendingVotes[player.id] !== undefined) continue;
 
-        try {
-          const response = await fetch('/api/ai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              gameState,
-              playerId: player.id,
-              action: 'vote',
-            }),
-          });
-
-          const data = await response.json();
-          const approve = data.approve ?? Math.random() > 0.5;
-
-          addPendingVote(player.id, approve);
-          await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
-        } catch (error) {
-          console.error('AI Vote Error:', error);
-          addPendingVote(player.id, Math.random() > 0.5);
-        }
+        await requestAIVote(player.id);
       }
     };
 
@@ -70,6 +81,8 @@ export default function VotingPanel() {
 
   // 所有票收集完毕，自动 reveal
   useEffect(() => {
+    if (!gameState) return;
+
     if (allVotesCollected && !votesRevealed && !isRevealing) {
       setIsRevealing(true);
       setTimeout(() => {
@@ -77,6 +90,8 @@ export default function VotingPanel() {
       }, 1000);
     }
   }, [allVotesCollected, votesRevealed, isRevealing]);
+
+  if (!gameState) return null;
 
   const handleVote = (approve: boolean) => {
     addPendingVote(humanPlayerId, approve);
