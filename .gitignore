@@ -49,3 +49,7 @@ next-env.d.ts
 
 # local data archives
 data/games_old_models_archive.jsonl
+*.retrace.json
+
+avalon_sample.jsonl
+audit/
