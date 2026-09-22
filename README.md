@@ -7,7 +7,7 @@ LLM agents playing *The Resistance: Avalon*. Two things live in this repo:
 
 Both share the same TypeScript game engine (`lib/game/`), provider dispatch (`lib/ai/`), and prompt builders (`lib/security/aiPromptTemplate.ts`).
 
-![screenshot](docs/screenshot.png)
+![Mid-game screen (mock models)](docs/screenshot.png)
 
 ## Result
 
@@ -52,10 +52,13 @@ Limits. Only the GPT pair is statistically significant. n = 15 per arm, so the c
 
 | Path | What it is |
 |---|---|
-| `app/`, `components/` | Next.js web app (one human seat plus AI seats; lobby default is 10 players, 5–10 supported) |
-| `lib/game/` | Game engine (state machine, roles, vision) shared by the app and the batch runner |
-| `lib/ai/dispatch.ts` | Provider dispatch (Anthropic/OpenAI/Google/DeepSeek/xAI), timeouts, retries, typed failure results |
-| `lib/security/` | Prompt templates (full/naive modes) and input/output validators |
+| `app/`, `components/` | Next.js web app: `/` landing page, `/play` lobby (default 5 seats: you + 4 models; 5–10 supported), `/game`, `/api/ai` |
+| `lib/game/` | Game engine (state machine, roles, vision), store, event-history builder; shared by the app and the batch runner |
+| `lib/ai/` | Provider dispatch (Anthropic/OpenAI/Google/DeepSeek/xAI) with timeouts, retries and typed failures; `mockProvider.ts` for keyless games |
+| `lib/api/` | zod schema for `/api/ai` requests (bounds, model allowlist) |
+| `lib/i18n/` | UI strings (zh-CN default, en) and the locale toggle store |
+| `lib/security/` | Prompt templates (full/naive modes) and input/output validators; prompts are Chinese |
+| `tests/`, `e2e/` | Vitest unit tests; Playwright end-to-end suite that plays a full game under mock AI |
 | `scripts/` | Batch runner (`batch.ts`), the 9 configs (`configs.ts`), report generator (`metrics.ts`), provider smoke test (`smoke.ts`). See `scripts/README.md` |
 | `data/games.jsonl` | The dataset: 140 games, one JSON object per line. Frozen; do not regenerate in place |
 | `results/` | Committed output of `npm run metrics` |
@@ -110,6 +113,30 @@ cp .env.example .env.local   # fill in the 5 provider API keys
 npm run smoke                # one tiny call per model; prints ok/error/latency
 npm run dev                  # http://localhost:3000
 ```
+
+No keys? Set `MOCK_AI=1` and every seat is answered by a deterministic, role-aware mock provider (speeches are labelled `[mock]`). The gate refuses to activate when the `VERCEL` env var is set, so it cannot run on the deployment.
+
+```bash
+MOCK_AI=1 npm run dev        # PowerShell: $env:MOCK_AI='1'; npm run dev
+```
+
+### Web app
+
+- **Lobby (`/play`)**: pick the player count, one model per AI seat (or "same for all"), and under 高级设置 the prompt mode (完整策略 = the experiment's full prompt, 基础 = its naive baseline), temperature (or provider default), max output tokens (100–1500), and 快速模式 (one discussion round instead of two). Settings are fixed at game start and shown in the in-game settings dialog.
+- **Game (`/game`)**: two discussion rounds per proposal (as in the experiment), a vote matrix (players × proposals), fail-card counts on the quest tracker, a transcript grouped by quest and proposal, and a flat log. When a provider call fails you see which seat and why, with retry and skip; nothing is ever substituted silently.
+- **Language**: the interface is Chinese by default; the 中 / EN toggle in the header switches to English (prompts to the models stay Chinese). Progress is saved in the browser, so a refresh resumes the game without replaying AI turns.
+
+### Checks
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm test                     # vitest: engine rules, validators, parsers, dispatch, schema, store, mock, history
+npm run build
+npm run test:e2e             # playwright: serves the production build on :3100 with MOCK_AI=1 (run build first)
+```
+
+CI runs the same five steps on Node 22 (`.github/workflows/ci.yml`), the e2e job in parallel, and uploads `docs/screenshot.png` from the mock game.
 
 The web app's model strings in `lib/game/types.ts` are newer than the ones the dataset was collected with; `analysis/config_map.md` records the April-2026 strings.
 
