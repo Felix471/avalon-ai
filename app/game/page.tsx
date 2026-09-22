@@ -13,12 +13,13 @@ import AssassinationPanel from '@/components/Game/AssassinationPanel';
 import GameOverPanel from '@/components/Game/GameOverPanel';
 import QuestTracker from '@/components/Game/QuestTracker';
 import GameLog from '@/components/Game/GameLog';
-import HistoryPanel from '@/components/Game/HistoryPanel';
+import VoteMatrix from '@/components/Game/VoteMatrix';
+import Transcript from '@/components/Game/Transcript';
 import AssassinFloatingButton from '@/components/Game/AssassinFloatingButton';
 import VisionPanel from '@/components/Game/VisionPanel';
 import { ExitGameButton } from '@/components/Game/ExitGameButton';
 import { panelClass, panelHeadingClass, subtleTextClass } from '@/components/Game/ui';
-import { Swords } from 'lucide-react';
+import { ScrollText, Swords } from 'lucide-react';
 
 export default function GamePage() {
   const router = useRouter();
@@ -107,7 +108,7 @@ export default function GamePage() {
             <VisionPanel />
 
             {/* 历史记录面板 */}
-            <HistoryPanel />
+            <VoteMatrix />
 
             {/* 任务执行结果（只在quest阶段后显示） */}
             {gameState.phase === 'quest' && (
@@ -135,8 +136,18 @@ export default function GamePage() {
               {renderPhasePanel()}
             </div>
 
+            <Transcript />
+
             {/* 游戏日志 */}
-            <GameLog />
+            <details>
+              <summary className={`${panelClass} flex cursor-pointer list-none items-center gap-2 text-sm text-slate-300`}>
+                <ScrollText aria-hidden="true" className="size-4" />
+                完整记录（按时间）
+              </summary>
+              <div className="mt-2">
+                <GameLog />
+              </div>
+            </details>
           </div>
         </div>
       </div>

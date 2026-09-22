@@ -91,6 +91,17 @@ test('plays a 5-player mock game to game over', async ({ page }) => {
     .locator('[data-quest-result]:not([data-quest-result="pending"])')
     .count();
   expect(finishedQuests).toBeGreaterThanOrEqual(3);
+
+  const voteMatrix = page.getByTestId('vote-matrix');
+  await expect(voteMatrix).toBeVisible();
+  expect(
+    await voteMatrix.locator('[data-testid="vote-cell"] svg').count(),
+    'vote matrix should show at least one approval or rejection icon',
+  ).toBeGreaterThan(0);
+
+  const transcript = page.getByTestId('transcript');
+  await expect(transcript).toBeVisible();
+  expect(await transcript.locator('details').count()).toBeGreaterThanOrEqual(3);
 });
 
 test('lobby renders', async ({ page }) => {

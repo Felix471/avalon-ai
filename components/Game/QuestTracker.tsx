@@ -19,6 +19,10 @@ export default function QuestTracker() {
         const isCurrent = questNumber === currentQuest;
         const requiredPlayers = questSizes[index];
         const needsDoubleFail = doubleFailQuests.includes(questNumber);
+        const isResolved = quest.result === 'success' || quest.result === 'fail';
+        const failCount = isResolved
+          ? Object.values(quest.actions ?? {}).filter(action => !action).length
+          : undefined;
 
         // 确定任务状态的颜色
         let bgColor = 'bg-slate-700';        // 未进行
@@ -43,6 +47,7 @@ export default function QuestTracker() {
           <div
             key={questNumber}
             data-quest-result={quest.result}
+            data-fail-count={failCount}
             className={`
               relative flex flex-col items-center justify-center
               h-12 w-10 rounded-lg border-2 text-[11px] tabular-nums transition-all sm:h-14 sm:w-12 sm:text-xs
@@ -60,6 +65,12 @@ export default function QuestTracker() {
             <span className={`font-bold ${textColor}`}>
               {requiredPlayers}人
             </span>
+
+            {isResolved && (
+              <span className={`text-[10px] leading-none ${textColor}`}>
+                {failCount} 失败
+              </span>
+            )}
 
             {/* 双失败标记 */}
             {needsDoubleFail && (
