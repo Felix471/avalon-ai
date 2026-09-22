@@ -22,6 +22,10 @@ describe('game store phase progress persistence', () => {
     expect(state.pendingVotes).toEqual({});
   });
 
+  it('uses five players as the default lobby configuration', () => {
+    expect(useGameStore.getState().config.playerCount).toBe(5);
+  });
+
   it('appends speeches and advances the discussion step', () => {
     useGameStore.getState().startGame();
     useGameStore.getState().appendDiscussionSpeech(0, 2, 'hi');
@@ -80,5 +84,19 @@ describe('game store phase progress persistence', () => {
       assassination: { humanOverride: false },
     });
     expect(migrated.pendingVotes).toEqual({});
+  });
+
+  it('preserves saved player-count choices in the version 3 migration', async () => {
+    const migrate = useGameStore.persist.getOptions().migrate;
+    expect(migrate).toBeDefined();
+
+    const savedConfig = { ...useGameStore.getState().config, playerCount: 8 };
+    const migrated = await migrate!({ config: savedConfig }, 2) as { config: GameConfig };
+    const missingPlayerCount = await migrate!({ config: {} }, 2) as {
+      config: Partial<GameConfig>;
+    };
+
+    expect(migrated.config.playerCount).toBe(8);
+    expect(missingPlayerCount.config.playerCount).toBeUndefined();
   });
 });

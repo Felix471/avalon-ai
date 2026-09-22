@@ -19,6 +19,7 @@ import {
 } from '@/lib/security/outputValidator';
 import { checkRateLimit, getClientId } from '@/lib/security/rateLimiter';
 import { AIProviderResult, callAIProvider } from '@/lib/ai/dispatch';
+import { isMockAIEnabled } from '@/lib/ai/mockProvider';
 
 // ==================== 类型定义 ====================
 
@@ -73,20 +74,23 @@ export async function POST(request: NextRequest) {
     const body: AIRequest = parsedRequest.data;
 
     // 速率限制检查
-    const rateCheck = checkRateLimit(clientId, body.action);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        { error: '请求过于频繁，请稍后再试', retryAfter: Math.ceil(rateCheck.resetIn / 1000) },
-        { status: 429 }
-      );
-    }
+    // Mock games run quickly and do not consume provider quota.
+    if (!isMockAIEnabled()) {
+      const rateCheck = checkRateLimit(clientId, body.action);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { error: '请求过于频繁，请稍后再试', retryAfter: Math.ceil(rateCheck.resetIn / 1000) },
+          { status: 429 }
+        );
+      }
 
-    const globalCheck = checkRateLimit(clientId, 'global');
-    if (!globalCheck.allowed) {
-      return NextResponse.json(
-        { error: 'API 调用次数已达上限', retryAfter: Math.ceil(globalCheck.resetIn / 1000) },
-        { status: 429 },
-      );
+      const globalCheck = checkRateLimit(clientId, 'global');
+      if (!globalCheck.allowed) {
+        return NextResponse.json(
+          { error: 'API 调用次数已达上限', retryAfter: Math.ceil(globalCheck.resetIn / 1000) },
+          { status: 429 },
+        );
+      }
     }
 
     const { playerId, action, recentSpeeches, humanInput, promptMode = 'full' } = body;
@@ -141,7 +145,7 @@ async function handleDiscussion(
 
   const prompt = buildDiscussionPrompt(gameState, playerId, sanitizedSpeeches, mode);
 
-  const aiResult = await callAIProvider(player.aiModel!, prompt, 'discussion');
+  const aiResult = await callAIProvider(player.aiModel!, prompt, 'discussion', { gameState, playerId });
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
@@ -171,7 +175,7 @@ async function handleVoting(
   const proposedTeam = gameState.currentProposedTeam || [];
 
   const prompt = buildVotingPrompt(gameState, playerId, proposedTeam, mode);
-  const aiResult = await callAIProvider(player.aiModel!, prompt, 'voting');
+  const aiResult = await callAIProvider(player.aiModel!, prompt, 'voting', { gameState, playerId });
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
@@ -201,7 +205,7 @@ async function handleQuestAction(
   }
 
   const prompt = buildQuestActionPrompt(gameState, playerId, mode);
-  const aiResult = await callAIProvider(player.aiModel!, prompt, 'quest');
+  const aiResult = await callAIProvider(player.aiModel!, prompt, 'quest', { gameState, playerId });
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
@@ -227,7 +231,7 @@ async function handleTeamBuilding(
   const requiredSize = gameState.quests[gameState.currentQuest - 1].requiredPlayers;
   const prompt = buildTeamBuildingPrompt(gameState, playerId, mode);
 
-  const aiResult = await callAIProvider(player.aiModel!, prompt, 'team_building');
+  const aiResult = await callAIProvider(player.aiModel!, prompt, 'team_building', { gameState, playerId });
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 
@@ -261,7 +265,7 @@ async function handleAssassination(
   const goodPlayers = gameState.players.filter(p => ROLES[p.role!].team === 'good');
   const prompt = buildAssassinationPrompt(gameState, playerId, mode);
 
-  const aiResult = await callAIProvider(player.aiModel!, prompt, 'assassination');
+  const aiResult = await callAIProvider(player.aiModel!, prompt, 'assassination', { gameState, playerId });
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
 

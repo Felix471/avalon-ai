@@ -237,7 +237,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
           const speakers = getSpeakerOrder(state);
           for (const player of speakers) {
             const prompt = buildDiscussionPrompt(state, player.id, recentSpeeches, mode);
-            const result = await callAIProvider(player.aiModel!, prompt, 'discussion');
+            const result = await callAIProvider(player.aiModel!, prompt, 'discussion', {
+              gameState: state,
+              playerId: player.id,
+            });
             let speech: string;
             let providerFallback = false;
             if (!result.ok) {
@@ -288,7 +291,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'team_building': {
         const leader = getCurrentLeader(state);
         const prompt = buildTeamBuildingPrompt(state, leader.id, mode);
-        const result = await callAIProvider(leader.aiModel!, prompt, 'team_building');
+        const result = await callAIProvider(leader.aiModel!, prompt, 'team_building', {
+          gameState: state,
+          playerId: leader.id,
+        });
         let team: number[];
         pendingTeamProviderFallback = !result.ok;
         if (!result.ok) {
@@ -345,7 +351,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
 
         for (const player of state.players) {
           const prompt = buildVotingPrompt(state, player.id, state.currentProposedTeam || [], mode);
-          const result = await callAIProvider(player.aiModel!, prompt, 'voting');
+          const result = await callAIProvider(player.aiModel!, prompt, 'voting', {
+            gameState: state,
+            playerId: player.id,
+          });
           let approve: boolean;
           if (!result.ok) {
             providerFailures.push({
@@ -415,7 +424,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
             state = submitQuestAction(state, playerId, true);
           } else {
             const prompt = buildQuestActionPrompt(state, playerId, mode);
-            const result = await callAIProvider(player.aiModel!, prompt, 'quest');
+            const result = await callAIProvider(player.aiModel!, prompt, 'quest', {
+              gameState: state,
+              playerId,
+            });
             let success: boolean;
             if (!result.ok) {
               providerFailures.push({
@@ -464,7 +476,10 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'assassination': {
         const assassin = state.players.find(p => p.role === 'assassin')!;
         const prompt = buildAssassinationPrompt(state, assassin.id, mode);
-        const result = await callAIProvider(assassin.aiModel!, prompt, 'assassination');
+        const result = await callAIProvider(assassin.aiModel!, prompt, 'assassination', {
+          gameState: state,
+          playerId: assassin.id,
+        });
         let targetId: number;
         assassinationProviderFallback = !result.ok;
         if (!result.ok) {

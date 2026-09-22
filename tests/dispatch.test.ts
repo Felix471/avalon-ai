@@ -20,6 +20,8 @@ function model(provider = 'openai', name = 'gpt-5.4-mini') {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  delete process.env.MOCK_AI;
+  delete process.env.VERCEL;
   process.env.OPENAI_API_KEY = 'test';
   process.env.ANTHROPIC_API_KEY = 'test';
   process.env.GOOGLE_API_KEY = 'test';
@@ -35,6 +37,33 @@ afterEach(() => {
 });
 
 describe('callAIProvider', () => {
+  it('uses the mock provider without calling fetch', async () => {
+    process.env.MOCK_AI = '1';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callAIProvider(model(), 'prompt', 'voting')).resolves.toEqual({
+      ok: true,
+      text: 'APPROVE',
+      latencyMs: 5,
+      attempts: 1,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not use the mock provider when VERCEL is set', async () => {
+    process.env.MOCK_AI = '1';
+    process.env.VERCEL = '1';
+    const fetchMock = vi.fn().mockResolvedValue(openAIResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callAIProvider(model(), 'prompt', 'voting')).resolves.toMatchObject({
+      ok: true,
+      text: 'OK',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('returns a successful OpenAI response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(openAIResponse()));
 

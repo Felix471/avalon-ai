@@ -7,9 +7,14 @@
  * Includes request timeouts and exponential backoff for transient failures.
  */
 
+import { isMockAIEnabled, mockAIResponse } from './mockProvider';
+import { GameState } from '@/lib/game/types';
+
 export type AIProviderResult =
   | { ok: true; text: string; latencyMs: number; attempts: number }
   | { ok: false; error: string; status?: number; attempts: number; latencyMs: number };
+
+let hasLoggedMockProvider = false;
 
 class ProviderError extends Error {
   constructor(
@@ -244,15 +249,27 @@ async function sleep(ms: number): Promise<void> {
 export async function callAIProvider(
   model: { provider: string; model: string; name?: string },
   prompt: string,
-  action: string
+  action: string,
+  context?: { gameState?: GameState; playerId?: number },
 ): Promise<AIProviderResult> {
+  if (isMockAIEnabled()) {
+    if (!hasLoggedMockProvider) {
+      console.error('[AI_CALL] MOCK_AI=1: using mock provider');
+      hasLoggedMockProvider = true;
+    }
+    return {
+      ok: true,
+      text: mockAIResponse({ model, prompt, action, context }),
+      latencyMs: 5,
+      attempts: 1,
+    };
+  }
+
   const MAX_RETRIES = 3;
   const INITIAL_DELAY_MS = 2000;
   const REQUEST_TIMEOUT_MS = 30_000;
   const startedAt = Date.now();
   let attempts = 0;
-
-  void action;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     attempts = attempt + 1;

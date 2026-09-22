@@ -100,7 +100,7 @@ const defaultVariantRules: VariantRules = {
 };
 
 const defaultConfig: GameConfig = {
-  playerCount: 10,
+  playerCount: 5,
   enabledModels: AI_MODELS.map(m => m.id),
   roles: [],
   questSizes: [],
@@ -374,7 +374,7 @@ export const useGameStore = create<GameStore>()(
         return localStorage;
       }),
       // Persist durable game data without serializing store actions.
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         config: state.config,
         gameState: state.gameState,
@@ -382,13 +382,17 @@ export const useGameStore = create<GameStore>()(
         pendingVotes: state.pendingVotes,
       }),
       migrate: (persistedState, version) => {
-        const state = persistedState as Partial<GameStore>;
+        let state = persistedState as Partial<GameStore>;
         if (version < 2) {
-          return {
+          state = {
             ...state,
             phaseProgress: createPhaseProgress(state.gameState ?? null),
             pendingVotes: {},
           };
+        }
+        if (version < 3) {
+          // Version 3 changes only the default; preserve saved config, including an absent playerCount.
+          return state;
         }
         return state;
       },
