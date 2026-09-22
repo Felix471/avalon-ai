@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '@/lib/game/store';
 import { getCurrentLeader } from '@/lib/game/engine';
+import { DISCUSSION_ROUNDS } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, AlertTriangle, Send, Info, MessageCircle } from 'lucide-react';
@@ -140,25 +141,29 @@ function SecureSpeechInput({
 // ==================== 主组件 ====================
 
 export default function DiscussionPanel() {
-  const { gameState, addDiscussion, addSystemEvent, goToTeamBuilding } = useGameStore();
-  const [hasHumanSpoken, setHasHumanSpoken] = useState(false);
+  const {
+    gameState,
+    addDiscussion,
+    addSystemEvent,
+    nextDiscussionRound,
+    goToTeamBuilding,
+  } = useGameStore();
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [currentSpeakerIndex, setCurrentSpeakerIndex] = useState(0);
   const [aiResponses, setAiResponses] = useState<Map<number, string>>(new Map());
   const [seatErrors, setSeatErrors] = useState<Record<number, string>>({});
   const [seatErrorTitles, setSeatErrorTitles] = useState<Record<number, string>>({});
-  const requestedSpeakerRef = useRef<number | null>(null);
+  const requestedStepRef = useRef<number | null>(null);
 
   // 重置状态（当进入新的发言阶段时）
   useEffect(() => {
     if (!gameState) return;
 
-    setHasHumanSpoken(false);
     setCurrentSpeakerIndex(0);
     setAiResponses(new Map());
     setSeatErrors({});
     setSeatErrorTitles({});
-    requestedSpeakerRef.current = null;
+    requestedStepRef.current = null;
   }, [gameState?.currentQuest, gameState?.consecutiveRejects]);
 
   const players = gameState?.players ?? [];
@@ -174,32 +179,41 @@ export default function DiscussionPanel() {
     ...players.slice(0, currentLeaderIndex)
   ];
 
-  // 当前应该发言的玩家
-  const currentSpeaker = speakingOrder[currentSpeakerIndex];
+  // One discussion phase now costs 2 × (players − 1) model calls.
+  const totalSpeakingSteps = DISCUSSION_ROUNDS * players.length;
+  const currentSpeaker = speakingOrder[currentSpeakerIndex % players.length];
   const isHumanTurn = currentSpeaker?.id === humanPlayerId;
-  const allSpoken = currentSpeakerIndex >= players.length;
+  const allSpoken = currentSpeakerIndex >= totalSpeakingSteps;
 
   // 收集之前的发言（用于给 AI 上下文）
   const getRecentSpeeches = (): Array<{ playerId: number; content: string }> => {
     const speeches: Array<{ playerId: number; content: string }> = [];
     for (let i = 0; i < currentSpeakerIndex; i++) {
-      const speaker = speakingOrder[i];
-      const content = aiResponses.get(speaker.id);
-      if (content) {
-        speeches.push({ playerId: speaker.id, content });
+      const speaker = speakingOrder[i % players.length];
+      const content = aiResponses.get(i);
+      if (speaker && aiResponses.has(i)) {
+        speeches.push({ playerId: speaker.id, content: content! });
       }
     }
     return speeches;
   };
 
-  const requestAISpeech = async (playerId: number) => {
+  const completeSpeakingStep = (stepIndex: number) => {
+    if (stepIndex + 1 === players.length) {
+      nextDiscussionRound();
+    }
+    requestedStepRef.current = null;
+    setCurrentSpeakerIndex(stepIndex + 1);
+  };
+
+  const requestAISpeech = async (playerId: number, stepIndex: number) => {
     if (!gameState) return;
 
-    requestedSpeakerRef.current = playerId;
+    requestedStepRef.current = stepIndex;
     setIsProcessingAI(true);
     setSeatErrors(prev => {
       const next = { ...prev };
-      delete next[playerId];
+      delete next[stepIndex];
       return next;
     });
 
@@ -221,15 +235,15 @@ export default function DiscussionPanel() {
       }
       const speech = data.speech;
 
-      setAiResponses(prev => new Map(prev).set(playerId, speech));
+      setAiResponses(prev => new Map(prev).set(stepIndex, speech));
       addDiscussion(playerId, speech);
 
       await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
-      setCurrentSpeakerIndex(prev => prev + 1);
+      completeSpeakingStep(stepIndex);
     } catch (error) {
       const described = describeAIError(error);
-      setSeatErrors(prev => ({ ...prev, [playerId]: described.message }));
-      setSeatErrorTitles(prev => ({ ...prev, [playerId]: described.title }));
+      setSeatErrors(prev => ({ ...prev, [stepIndex]: described.message }));
+      setSeatErrorTitles(prev => ({ ...prev, [stepIndex]: described.title }));
     } finally {
       setIsProcessingAI(false);
     }
@@ -240,12 +254,15 @@ export default function DiscussionPanel() {
     if (!gameState) return;
     if (allSpoken || isHumanTurn || isProcessingAI) return;
     if (!currentSpeaker) return;
-    if (requestedSpeakerRef.current === currentSpeaker.id) return;
+    if (requestedStepRef.current === currentSpeakerIndex) return;
 
-    requestedSpeakerRef.current = currentSpeaker.id;
+    requestedStepRef.current = currentSpeakerIndex;
 
     // 延迟一下开始，避免过于突兀
-    const timer = setTimeout(() => requestAISpeech(currentSpeaker.id), 500);
+    const timer = setTimeout(
+      () => requestAISpeech(currentSpeaker.id, currentSpeakerIndex),
+      500
+    );
     return () => clearTimeout(timer);
   }, [currentSpeakerIndex, isHumanTurn, allSpoken, isProcessingAI]);
 
@@ -254,24 +271,22 @@ export default function DiscussionPanel() {
   // 人类发言提交
   const handleHumanSpeech = (content: string) => {
     // content 已经被 SecureSpeechInput 验证和清理过了
-    setAiResponses(prev => new Map(prev).set(humanPlayerId, content));
+    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, content));
     addDiscussion(humanPlayerId, content);
-    setHasHumanSpoken(true);
-    setCurrentSpeakerIndex(prev => prev + 1);
+    completeSpeakingStep(currentSpeakerIndex);
   };
 
   // 跳过发言
   const handleSkipSpeech = () => {
     const skipMessage = '[选择沉默]';
-    setAiResponses(prev => new Map(prev).set(humanPlayerId, skipMessage));
+    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, skipMessage));
     addDiscussion(humanPlayerId, skipMessage);
-    setHasHumanSpoken(true);
-    setCurrentSpeakerIndex(prev => prev + 1);
+    completeSpeakingStep(currentSpeakerIndex);
   };
 
   const handleRetryAISpeech = (playerId: number) => {
-    requestedSpeakerRef.current = null;
-    void requestAISpeech(playerId);
+    requestedStepRef.current = null;
+    void requestAISpeech(playerId, currentSpeakerIndex);
   };
 
   const handleSkipAISpeech = (playerId: number) => {
@@ -279,14 +294,13 @@ export default function DiscussionPanel() {
     const modelName = player?.aiModel?.name || 'AI';
     setSeatErrors(prev => {
       const next = { ...prev };
-      delete next[playerId];
+      delete next[currentSpeakerIndex];
       return next;
     });
-    setAiResponses(prev => new Map(prev).set(playerId, ''));
+    setAiResponses(prev => new Map(prev).set(currentSpeakerIndex, ''));
     addDiscussion(playerId, '');
     addSystemEvent(`玩家${playerId}（${modelName}）的发言已跳过（AI 不可用）`);
-    requestedSpeakerRef.current = null;
-    setCurrentSpeakerIndex(prev => prev + 1);
+    completeSpeakingStep(currentSpeakerIndex);
   };
 
   // 结束发言阶段
@@ -317,32 +331,38 @@ export default function DiscussionPanel() {
 
       {/* 发言记录 */}
       <div className="space-y-3 max-h-[300px] overflow-y-auto">
-        {speakingOrder.slice(0, currentSpeakerIndex).map((player, index) => {
-          const speech = aiResponses.get(player.id);
+        {Array.from({ length: Math.min(currentSpeakerIndex, totalSpeakingSteps) }, (_, index) => {
+          const player = speakingOrder[index % players.length];
+          const speech = aiResponses.get(index);
           const isHuman = player.id === humanPlayerId;
+          const round = Math.floor(index / players.length) + 1;
 
           return (
-            <div
-              key={player.id}
-              className={`
-                p-3 rounded-lg
-                ${isHuman 
-                  ? 'bg-blue-900/30 border border-blue-700' 
-                  : 'bg-slate-700/50'
-                }
-              `}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium">
-                  {isHuman ? '👤' : '🤖'} 玩家{player.id}
-                </span>
-                {!isHuman && (
-                  <span className="text-xs text-slate-500">
-                    ({player.aiModel?.name})
+            <div key={index} className="space-y-3">
+              {index % players.length === 0 && (
+                <div className="text-xs text-slate-500">第 {round} 轮</div>
+              )}
+              <div
+                className={`
+                  p-3 rounded-lg
+                  ${isHuman
+                    ? 'bg-blue-900/30 border border-blue-700'
+                    : 'bg-slate-700/50'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium">
+                    {isHuman ? '👤' : '🤖'} 玩家{player.id}
                   </span>
-                )}
+                  {!isHuman && (
+                    <span className="text-xs text-slate-500">
+                      ({player.aiModel?.name})
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-300 text-sm">{speech || '...'}</p>
               </div>
-              <p className="text-slate-300 text-sm">{speech || '...'}</p>
             </div>
           );
         })}
@@ -351,7 +371,7 @@ export default function DiscussionPanel() {
       {/* 当前发言者指示 / 输入框 */}
       {!allSpoken && (
         <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-600">
-          {isHumanTurn && !hasHumanSpoken ? (
+          {isHumanTurn ? (
             <div className="space-y-3">
               <div className="text-amber-400 font-medium">
                 🎤 轮到你发言了！
@@ -372,12 +392,12 @@ export default function DiscussionPanel() {
                 跳过发言（保持沉默）
               </Button>
             </div>
-          ) : currentSpeaker && seatErrors[currentSpeaker.id] ? (
-            <div title={seatErrorTitles[currentSpeaker.id]}>
+          ) : currentSpeaker && seatErrors[currentSpeakerIndex] ? (
+            <div title={seatErrorTitles[currentSpeakerIndex]}>
               <AISeatError
                 playerId={currentSpeaker.id}
                 modelName={currentSpeaker.aiModel?.name}
-                message={seatErrors[currentSpeaker.id]}
+                message={seatErrors[currentSpeakerIndex]}
                 onRetry={() => handleRetryAISpeech(currentSpeaker.id)}
                 onSkip={() => handleSkipAISpeech(currentSpeaker.id)}
               />
@@ -397,23 +417,26 @@ export default function DiscussionPanel() {
       <div className="flex items-center gap-2">
         <span className="text-sm text-slate-500">发言进度:</span>
         <div className="flex gap-1">
-          {speakingOrder.map((player, i) => (
-            <div
-              key={player.id}
-              className={`
-                w-6 h-6 rounded-full flex items-center justify-center text-xs
-                ${i < currentSpeakerIndex 
-                  ? 'bg-green-600 text-white'
-                  : i === currentSpeakerIndex
-                    ? 'bg-amber-500 text-white animate-pulse'
-                    : 'bg-slate-700 text-slate-500'
-                }
-              `}
-              title={`玩家${player.id}`}
-            >
-              {player.id}
-            </div>
-          ))}
+          {Array.from({ length: totalSpeakingSteps }, (_, i) => {
+            const player = speakingOrder[i % players.length];
+            return (
+              <div
+                key={i}
+                className={`
+                  w-6 h-6 rounded-full flex items-center justify-center text-xs
+                  ${i < currentSpeakerIndex
+                    ? 'bg-green-600 text-white'
+                    : i === currentSpeakerIndex
+                      ? 'bg-amber-500 text-white animate-pulse'
+                      : 'bg-slate-700 text-slate-500'
+                  }
+                `}
+                title={`玩家${player.id}`}
+              >
+                {player.id}
+              </div>
+            );
+          })}
         </div>
       </div>
 

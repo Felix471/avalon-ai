@@ -1,25 +1,5 @@
 import { GameState, QUEST_SIZES, ROLES } from '../lib/game/types';
 
-export function buildTeamBuildingPrompt(state: GameState, leaderId: number): string {
-  const questSizes = QUEST_SIZES[state.playerCount] || [2, 3, 2, 3, 3];
-  const requiredSize = questSizes[state.currentQuest - 1];
-
-  return `=== 系统指令 ===
-你是阿瓦隆游戏中的队长，需要选择 ${requiredSize} 名队员执行任务。
-
-【重要】必须选择恰好 ${requiredSize} 名玩家，不能多也不能少！
-
-【输出格式要求】
-只能输出 ${requiredSize} 个玩家编号，用逗号分隔。
-例如：1,3,5
-
-可选的玩家：${state.players.map(p => `玩家${p.id}`).join(', ')}
-当前任务：第 ${state.currentQuest} 轮
-必须选择：恰好 ${requiredSize} 名队员
-
-请输出你选择的 ${requiredSize} 个队员编号（用逗号分隔）：`;
-}
-
 export function parseAndValidateTeam(
   response: string,
   state: GameState,

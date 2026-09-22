@@ -6,7 +6,9 @@ import { validateSpeechInput, wrapUserInputForAI } from '@/lib/security/inputVal
 import {
   buildDiscussionPrompt,
   buildVotingPrompt,
-  buildQuestActionPrompt
+  buildQuestActionPrompt,
+  buildTeamBuildingPrompt,
+  buildAssassinationPrompt,
 } from '@/lib/security/aiPromptTemplate';
 import {
   validateDiscussionOutput,
@@ -25,6 +27,7 @@ interface AIRequest {
   action: 'discussion' | 'voting' | 'quest' | 'team_building' | 'assassination';
   recentSpeeches?: Array<{ playerId: number; content: string }>;
   humanInput?: string;
+  promptMode?: 'full' | 'naive';
 }
 
 type AIModelRef = { provider: string; model: string };
@@ -79,7 +82,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { gameState, playerId, action, recentSpeeches, humanInput } = body;
+    const {
+      gameState,
+      playerId,
+      action,
+      recentSpeeches,
+      humanInput,
+      promptMode = 'full',
+    } = body;
 
     if (!gameState || !playerId || !action) {
       return NextResponse.json({ error: '请求参数不完整' }, { status: 400 });
@@ -102,15 +112,15 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'discussion':
-        return await handleDiscussion(gameState, playerId, recentSpeeches || []);
+        return await handleDiscussion(gameState, playerId, recentSpeeches || [], promptMode);
       case 'voting':
-        return await handleVoting(gameState, playerId);
+        return await handleVoting(gameState, playerId, promptMode);
       case 'quest':
-        return await handleQuestAction(gameState, playerId);
+        return await handleQuestAction(gameState, playerId, promptMode);
       case 'team_building':
-        return await handleTeamBuilding(gameState, playerId);
+        return await handleTeamBuilding(gameState, playerId, promptMode);
       case 'assassination':
-        return await handleAssassination(gameState, playerId);
+        return await handleAssassination(gameState, playerId, promptMode);
       default:
         return NextResponse.json({ error: '未知的操作类型' }, { status: 400 });
     }
@@ -127,6 +137,7 @@ async function handleDiscussion(
   gameState: GameState,
   playerId: number,
   recentSpeeches: Array<{ playerId: number; content: string }>,
+  mode: 'full' | 'naive',
 ) {
   const player = gameState.players.find(p => p.id === playerId)!;
 
@@ -135,7 +146,7 @@ async function handleDiscussion(
     content: wrapUserInputForAI(s.content, s.playerId),
   }));
 
-  const prompt = buildDiscussionPrompt(gameState, playerId, sanitizedSpeeches);
+  const prompt = buildDiscussionPrompt(gameState, playerId, sanitizedSpeeches, mode);
 
   const aiResult = await callAIProvider(player.aiModel!, prompt, 'discussion');
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
@@ -161,11 +172,12 @@ async function handleDiscussion(
 async function handleVoting(
   gameState: GameState,
   playerId: number,
+  mode: 'full' | 'naive',
 ) {
   const player = gameState.players.find(p => p.id === playerId)!;
   const proposedTeam = gameState.currentProposedTeam || [];
 
-  const prompt = buildVotingPrompt(gameState, playerId, proposedTeam);
+  const prompt = buildVotingPrompt(gameState, playerId, proposedTeam, mode);
   const aiResult = await callAIProvider(player.aiModel!, prompt, 'voting');
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
@@ -186,6 +198,7 @@ async function handleVoting(
 async function handleQuestAction(
   gameState: GameState,
   playerId: number,
+  mode: 'full' | 'naive',
 ) {
   const player = gameState.players.find(p => p.id === playerId)!;
   const isEvil = ROLES[player.role!].team === 'evil';
@@ -194,7 +207,7 @@ async function handleQuestAction(
     return NextResponse.json({ success: true });
   }
 
-  const prompt = buildQuestActionPrompt(gameState, playerId);
+  const prompt = buildQuestActionPrompt(gameState, playerId, mode);
   const aiResult = await callAIProvider(player.aiModel!, prompt, 'quest');
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
   const aiResponse = aiResult.text;
@@ -215,37 +228,11 @@ async function handleQuestAction(
 async function handleTeamBuilding(
   gameState: GameState,
   playerId: number,
+  mode: 'full' | 'naive',
 ) {
   const player = gameState.players.find(p => p.id === playerId)!;
-
-  // 使用正确的任务人数配置
-  const QUEST_SIZES: Record<number, number[]> = {
-    5: [2, 3, 2, 3, 3],
-    6: [2, 3, 4, 3, 4],
-    7: [2, 3, 3, 4, 4],
-    8: [3, 4, 4, 5, 5],
-    9: [3, 4, 4, 5, 5],
-    10: [3, 4, 4, 5, 5],
-  };
-
-  const questSizes = QUEST_SIZES[gameState.playerCount] || [2, 3, 2, 3, 3];
-  const requiredSize = questSizes[gameState.currentQuest - 1];
-
-  const prompt = `
-=== 系统指令 ===
-你是阿瓦隆游戏中的队长，需要选择 ${requiredSize} 名队员执行任务。
-
-【重要】必须选择恰好 ${requiredSize} 名玩家，不能多也不能少！
-
-【输出格式要求】
-只能输出 ${requiredSize} 个玩家编号，用逗号分隔。
-例如：1,3,5
-
-可选的玩家：${gameState.players.map(p => `玩家${p.id}`).join(', ')}
-当前任务：第 ${gameState.currentQuest} 轮
-必须选择：恰好 ${requiredSize} 名队员
-
-请输出你选择的 ${requiredSize} 个队员编号（用逗号分隔）：`;
+  const requiredSize = gameState.quests[gameState.currentQuest - 1].requiredPlayers;
+  const prompt = buildTeamBuildingPrompt(gameState, playerId, mode);
 
   const aiResult = await callAIProvider(player.aiModel!, prompt, 'team_building');
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);
@@ -270,6 +257,7 @@ async function handleTeamBuilding(
 async function handleAssassination(
   gameState: GameState,
   playerId: number,
+  mode: 'full' | 'naive',
 ) {
   const player = gameState.players.find(p => p.id === playerId)!;
 
@@ -278,18 +266,7 @@ async function handleAssassination(
   }
 
   const goodPlayers = gameState.players.filter(p => ROLES[p.role!].team === 'good');
-
-  const prompt = `
-=== 系统指令 ===
-你是刺客，好人已经完成了3个任务，但你有最后一次机会。
-如果你能找出并刺杀梅林，坏人依然获胜！
-
-【输出格式要求】
-只能输出一个玩家编号，例如：3
-
-好人玩家：${goodPlayers.map(p => `玩家${p.id}`).join(', ')}
-
-请输出你要刺杀的玩家编号：`;
+  const prompt = buildAssassinationPrompt(gameState, playerId, mode);
 
   const aiResult = await callAIProvider(player.aiModel!, prompt, 'assassination');
   if (!aiResult.ok) return providerFailureResponse(player.aiModel!, aiResult);

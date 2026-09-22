@@ -254,6 +254,136 @@ ${gameStatus}
 你的选择：`;
 }
 
+// ==================== Team-building Prompt ====================
+
+export function buildTeamBuildingPrompt(
+  gameState: GameState,
+  leaderId: number,
+  mode: 'full' | 'naive' = 'full'
+): string {
+  const leader = gameState.players.find(player => player.id === leaderId)!;
+  const role = ROLES[leader.role!];
+  const vision = getPlayerVision(gameState, leaderId);
+  const requiredSize = gameState.quests[gameState.currentQuest - 1].requiredPlayers;
+  const isForcedFifthProposal = gameState.variantRules.fifthVoteRule === 'force_team'
+    && gameState.consecutiveRejects >= 4;
+
+  const visionLines = [
+    vision.knownEvil.length > 0
+      ? `【你看到的坏人】玩家${vision.knownEvil.join('、玩家')}`
+      : '',
+    vision.knownMerlinOrMorgana.length > 0
+      ? `【你看到的梅林或莫甘娜】玩家${vision.knownMerlinOrMorgana.join('、玩家')}`
+      : '',
+    vision.teammates.length > 0
+      ? `【你知道的队友】玩家${vision.teammates.join('、玩家')}`
+      : '',
+  ].filter(Boolean).join('\n');
+
+  const resolvedQuests = gameState.quests.filter(
+    quest => quest.result === 'success' || quest.result === 'fail'
+  );
+  const questHistory = resolvedQuests.length > 0
+    ? resolvedQuests.map(quest => {
+        const team = quest.team?.map(id => `玩家${id}`).join('、') || '未知';
+        return `- 任务${quest.questNumber}：队伍 ${team}；结果：${quest.result === 'success' ? '成功' : '失败'}`;
+      }).join('\n')
+    : '- 暂无已完成任务';
+
+  const lastQuestResultIndex = gameState.events.reduce(
+    (lastIndex, event, index) => event.type === 'quest_result' ? index : lastIndex,
+    -1
+  );
+  const currentQuestEvents = gameState.events.slice(lastQuestResultIndex + 1);
+  let rejectedVoteIndex = -1;
+  for (let index = currentQuestEvents.length - 1; index >= 0; index--) {
+    const event = currentQuestEvents[index];
+    if (event.type === 'vote_result' && event.metadata?.passed === false) {
+      rejectedVoteIndex = index;
+      break;
+    }
+  }
+
+  let rejectedProposalSection = '';
+  if (rejectedVoteIndex >= 0) {
+    let proposalIndex = -1;
+    for (let index = rejectedVoteIndex - 1; index >= 0; index--) {
+      if (currentQuestEvents[index].type === 'team_proposal') {
+        proposalIndex = index;
+        break;
+      }
+    }
+
+    const proposalEvent = proposalIndex >= 0 ? currentQuestEvents[proposalIndex] : undefined;
+    const proposedTeam = Array.isArray(proposalEvent?.metadata?.team)
+      ? proposalEvent.metadata.team.filter((id): id is number => typeof id === 'number')
+      : [];
+    const votes = currentQuestEvents
+      .slice(proposalIndex + 1, rejectedVoteIndex)
+      .filter(event => event.type === 'vote' && typeof event.playerId === 'number')
+      .map(event => `玩家${event.playerId}：${event.metadata?.approve === true ? '同意' : '反对'}`);
+    const voteResult = currentQuestEvents[rejectedVoteIndex];
+
+    rejectedProposalSection = `
+【本轮最近一次被否决的提案】
+- 队伍：${proposedTeam.length > 0 ? proposedTeam.map(id => `玩家${id}`).join('、') : '未知'}
+- 投票：${votes.length > 0 ? votes.join('；') : voteResult.content}`;
+  }
+
+  const discussionEvents = gameState.events.filter(event => event.type === 'discussion');
+  const speechesSection = discussionEvents.length > 0
+    ? discussionEvents.slice(-10)
+        .map(event => `玩家${event.playerId}：${event.content.substring(0, 100)}`)
+        .join('\n')
+    : '暂无发言';
+
+  let strategySection = '';
+  if (mode === 'full') {
+    const strategyLines = role.team === 'good'
+      ? [
+          '- 如果你信任自己，可以把自己选入队伍。',
+          '- 避开你确定或怀疑是坏人的玩家。',
+          '- 优先选择参加过成功任务的玩家。',
+          ...(leader.role === 'merlin'
+            ? ['- 不要因为总是排除你看到的坏人而暴露梅林的知识。']
+            : []),
+        ]
+      : [
+          '- 需要破坏任务时，让一名坏人队友或你自己进入队伍。',
+          '- 组队必须让好人玩家觉得合理，避免暴露坏人阵营。',
+        ];
+    strategySection = `\n【组队策略】\n${strategyLines.join('\n')}\n`;
+  }
+
+  return `你是阿瓦隆游戏中负责组队的队长。
+
+【你的身份】
+- 玩家编号：${leaderId}
+- 角色：${role.name}
+- 阵营：${role.team === 'good' ? '好人' : '坏人'}
+${visionLines || '【你的视野】没有额外已知信息'}
+
+【当前局势】
+- 当前任务：第 ${gameState.currentQuest} 轮
+- 任务比分：好人 ${gameState.goodWins} 胜 / 坏人 ${gameState.evilWins} 胜
+- 连续否决：${gameState.consecutiveRejects} 次
+- 是否为强制第5次提案：${isForcedFifthProposal ? '是' : '否'}
+- 必须选择：恰好 ${requiredSize} 名队员
+- 可选玩家编号：${gameState.players.map(player => player.id).join(',')}
+
+【任务历史】
+${questHistory}
+${rejectedProposalSection}
+
+【最近发言】
+${speechesSection}
+${strategySection}
+【输出格式要求】
+只能输出 ${requiredSize} 个玩家编号，用逗号分隔。例如：1,3,5
+
+你选择的队员编号：`;
+}
+
 // ==================== 刺杀阶段 Prompt ====================
 
 export function buildAssassinationPrompt(
@@ -265,7 +395,6 @@ export function buildAssassinationPrompt(
 
   // 收集游戏中的线索
   const discussionEvents = gameState.events.filter(e => e.type === 'discussion');
-  const voteEvents = gameState.events.filter(e => e.type === 'vote');
 
   if (mode === 'naive') {
     return `你是刺客！好人已经完成了3个任务，但你有最后一次机会——找出并刺杀梅林！

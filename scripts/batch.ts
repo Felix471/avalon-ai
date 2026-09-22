@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pLimit from 'p-limit';
 import {
-  GameState, GameConfig, Player, ROLES, QUEST_SIZES,
+  GameState, GameConfig, Player, ROLES, QUEST_SIZES, DISCUSSION_ROUNDS,
   ROLE_CONFIGS, DOUBLE_FAIL_QUESTS, AIModel,
 } from '../lib/game/types';
 import {
@@ -30,7 +30,7 @@ import {
 } from '../lib/game/engine';
 import {
   buildDiscussionPrompt, buildVotingPrompt,
-  buildQuestActionPrompt, buildAssassinationPrompt,
+  buildQuestActionPrompt, buildAssassinationPrompt, buildTeamBuildingPrompt,
 } from '../lib/security/aiPromptTemplate';
 import {
   validateDiscussionOutput, validateVotingOutput,
@@ -38,11 +38,7 @@ import {
 } from '../lib/security/outputValidator';
 import { callAIProvider } from '../lib/ai/dispatch';
 import { CONFIGS, ALL_CONFIG_NAMES, BatchConfig, PromptMode } from './configs';
-import {
-  buildTeamBuildingPrompt,
-  parseAndValidateTeam,
-  parseTargetId,
-} from './batchParsers';
+import { parseAndValidateTeam, parseTargetId } from './batchParsers';
 
 // ==================== Types ====================
 
@@ -237,7 +233,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
       case 'discussion': {
         // Replicates store.ts:137 nextDiscussionRound logic.
         // Source-of-truth: lib/game/store.ts:137-148
-        for (let round = 1; round <= 2; round++) {
+        for (let round = 1; round <= DISCUSSION_ROUNDS; round++) {
           const speakers = getSpeakerOrder(state);
           for (const player of speakers) {
             const prompt = buildDiscussionPrompt(state, player.id, recentSpeeches, mode);
@@ -280,8 +276,8 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
             });
             llmCallCount++;
           }
-          if (round === 1) {
-            state = { ...state, discussionRound: 2 };
+          if (round < DISCUSSION_ROUNDS) {
+            state = { ...state, discussionRound: round + 1 };
           }
         }
         state = { ...state, phase: 'team_building' as const, hasDiscussedThisQuest: true };
@@ -291,7 +287,7 @@ async function runGame(config: BatchConfig): Promise<GameLog> {
 
       case 'team_building': {
         const leader = getCurrentLeader(state);
-        const prompt = buildTeamBuildingPrompt(state, leader.id);
+        const prompt = buildTeamBuildingPrompt(state, leader.id, mode);
         const result = await callAIProvider(leader.aiModel!, prompt, 'team_building');
         let team: number[];
         pendingTeamProviderFallback = !result.ok;

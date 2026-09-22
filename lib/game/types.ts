@@ -227,6 +227,9 @@ export interface GameConfig {
   variantRules: VariantRules;
 }
 
+// Matches the discussion-round count used by the batch collection setting.
+export const DISCUSSION_ROUNDS = 2;
+
 export const ROLE_CONFIGS: Record<number, RoleType[]> = {
   5: ['merlin', 'percival', 'loyal', 'assassin', 'morgana'],
   6: ['merlin', 'percival', 'loyal', 'loyal', 'assassin', 'morgana'],

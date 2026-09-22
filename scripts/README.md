@@ -72,3 +72,7 @@ Games run with concurrency level 2 (`p-limit(2)`). LLM calls within a game are s
 - Malformed LLM output → validator fallback recorded in `fallbackCounts` (parser fallback counts only)
 - Game crash → logged to `data/failures.jsonl`, next game continues
 - `data/games.jsonl` was collected before `providerFailures` and the per-decision fallback fields existed, so historical rows do not contain them
+
+## Prompt changes after collection
+
+The team-building prompt now includes the leader's role, vision, game history, and prompt mode; the dataset was collected with a context-free team-building prompt. The web app now runs the same two discussion rounds per proposal as the batch runner.
