@@ -1,5 +1,5 @@
 # Avalon AI Batch Results Summary
-Generated: 2026-04-23T03:17:07.073Z
+Generated: 2026-09-22T05:33:30.672Z
 Total games: 140
 
 ## heterogeneous-full (n=20)
@@ -271,11 +271,11 @@ Total games: 140
 
 | Quest Round | Evil on Team | Sabotage Count | Sabotage Rate |
 |------------|-------------|---------------|--------------|
-| 1 | 174 | 94 | 54.0% |
-| 2 | 245 | 176 | 71.8% |
-| 3 | 57 | 44 | 77.2% |
-| 4 | 69 | 57 | 82.6% |
-| 5 | 30 | 26 | 86.7% |
+| 1 | 114 | 39 | 34.2% |
+| 2 | 169 | 130 | 76.9% |
+| 3 | 117 | 99 | 84.6% |
+| 4 | 113 | 84 | 74.3% |
+| 5 | 62 | 45 | 72.6% |
 
 ### Self-Recommendation Language by Config
 

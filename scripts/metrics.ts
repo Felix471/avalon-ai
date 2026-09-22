@@ -259,8 +259,11 @@ function main() {
 
   for (const game of games) {
     const evilIds = new Set(game.players.filter(p => EVIL_ROLES.includes(p.role)).map(p => p.id));
-    for (const quest of game.quests) {
-      const round = quest.round;
+    // quests[].round in data/games.jsonl is unreliable (logger bug at collection time copied
+    // the round of an earlier quest with the same team; see README "Known data issues").
+    // The array is in execution order, so the true round is the index + 1.
+    game.quests.forEach((quest, questIndex) => {
+      const round = questIndex + 1;
       if (!sabotageByRound[round]) sabotageByRound[round] = { evilOnTeam: 0, failCount: 0 };
       for (const [pid, action] of Object.entries(quest.actions)) {
         if (evilIds.has(parseInt(pid))) {
@@ -268,7 +271,7 @@ function main() {
           if (action === 'fail') sabotageByRound[round].failCount++;
         }
       }
-    }
+    });
   }
 
   summaryLines.push('### Evil Sabotage Timing by Quest Round');
