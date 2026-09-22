@@ -13,6 +13,8 @@ export class AIRequestError extends Error {
 
 export interface DescribedAIError {
   message: string;
+  messageKey: 'error.rateLimited' | 'error.unparseable' | 'error.provider' | 'error.network';
+  params?: Record<string, string | number>;
   title: string;
   kind: 'provider' | 'unparseable' | 'rate_limited' | 'network';
   provider?: string;
@@ -35,6 +37,8 @@ export function describeAIError(error: unknown): DescribedAIError {
     if (error.status === 429) {
       return {
         message: `请求过于频繁，请 ${retryAfterSeconds} 秒后重试`,
+        messageKey: 'error.rateLimited',
+        params: { seconds: retryAfterSeconds },
         title: details || error.message,
         kind: 'rate_limited',
         provider,
@@ -47,6 +51,7 @@ export function describeAIError(error: unknown): DescribedAIError {
     if (error.status === 502 && serverError === 'unparseable') {
       return {
         message: 'AI 返回了无法解析的内容',
+        messageKey: 'error.unparseable',
         title: details || error.message,
         kind: 'unparseable',
         provider,
@@ -57,6 +62,7 @@ export function describeAIError(error: unknown): DescribedAIError {
 
     return {
       message: 'AI 暂时不可用',
+      messageKey: 'error.provider',
       title: details || error.message,
       kind: 'provider',
       provider,
@@ -68,6 +74,7 @@ export function describeAIError(error: unknown): DescribedAIError {
   if (error instanceof TypeError) {
     return {
       message: '网络错误，请检查连接',
+      messageKey: 'error.network',
       title: error.message,
       kind: 'network',
     };
@@ -75,6 +82,7 @@ export function describeAIError(error: unknown): DescribedAIError {
 
   return {
     message: 'AI 暂时不可用',
+    messageKey: 'error.provider',
     title: error instanceof Error ? error.message : String(error),
     kind: 'provider',
   };

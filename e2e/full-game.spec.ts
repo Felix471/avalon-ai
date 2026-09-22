@@ -151,3 +151,19 @@ test('game screen has no horizontal overflow at 360px', async ({ page }) => {
 
   expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
 });
+
+test('locale toggle switches to English and persists across pages', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+
+  await page.getByTestId('locale-toggle').getByRole('button', { name: 'EN' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByTestId('landing-play')).toContainText(/Play/i);
+
+  await page.goto('/play');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByTestId('lobby-start')).toHaveText(/Start game|Overwrite/);
+
+  await page.getByTestId('locale-toggle').getByRole('button', { name: '中' }).click();
+  await expect(page.getByTestId('lobby-start')).toHaveText(/开始游戏|覆盖并开始新游戏/);
+});

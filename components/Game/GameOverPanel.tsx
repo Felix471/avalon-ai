@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Bot, Drama, RotateCcw, ShieldCheck, Skull, Swords, Trophy, User, X } from 'lucide-react';
 import { RoleIcon } from './roleIcon';
 import { evilColor, goodColor, panelClass, panelHeadingClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function GameOverPanel() {
   const router = useRouter();
+  const t = useT();
   const { gameState, resetGame } = useGameStore();
 
   if (!gameState) return null;
@@ -35,7 +37,7 @@ export default function GameOverPanel() {
         ) : (
           <Skull aria-hidden="true" className="size-5" />
         )}
-        {humanWon ? '你赢了！' : '你输了...'}
+        {t(humanWon ? 'gameOver.won' : 'gameOver.lost')}
       </h2>
 
       <div className={`
@@ -46,46 +48,43 @@ export default function GameOverPanel() {
           {winner === 'good' ? (
             <>
               <Trophy aria-hidden="true" className="size-5 text-sky-400" />
-              <span className="text-sky-300">亚瑟阵营获胜！</span>
+              <span className="text-sky-300">{t('gameOver.goodWins')}</span>
             </>
           ) : (
             <>
               <Skull aria-hidden="true" className="size-5 text-rose-400" />
-              <span className="text-rose-300">莫德雷德阵营获胜！</span>
+              <span className="text-rose-300">{t('gameOver.evilWins')}</span>
             </>
           )}
         </div>
 
-        {/* 任务比分 */}
         <div className="mt-2 flex items-center justify-center gap-2 text-sm text-slate-400 tabular-nums">
-          任务比分:
+          {t('gameOver.score')}
           <ShieldCheck aria-hidden="true" className={`size-4 ${goodColor}`} />
           {goodWins} - {evilWins}
           <Skull aria-hidden="true" className={`size-4 ${evilColor}`} />
         </div>
 
-        {/* 刺杀结果 */}
         {assassinatedPlayer && (
           <div className="mt-3 pt-3 border-t border-slate-700">
             <p className="text-slate-300 text-sm">
-              刺客选择刺杀: <span className="text-amber-400">{assassinatedPlayer.name}</span>
+              {t('gameOver.assassinTarget', { player: t('player.label', { id: assassinatedPlayer.id }) })}
             </p>
             <p className={`mt-1 flex items-center justify-center gap-1 text-sm ${assassinationSuccess ? evilColor : goodColor}`}>
               {assassinationSuccess ? (
-                <><Swords aria-hidden="true" className="size-4" />刺杀成功！梅林被找出！</>
+                <><Swords aria-hidden="true" className="size-4" />{t('gameOver.assassinationSuccess')}</>
               ) : (
-                <><X aria-hidden="true" className="size-4" />刺杀失败！梅林安全了！</>
+                <><X aria-hidden="true" className="size-4" />{t('gameOver.assassinationFail')}</>
               )}
             </p>
           </div>
         )}
       </div>
 
-      {/* 所有角色揭示 */}
       <div className={panelClass}>
         <h3 className={`${panelHeadingClass} mb-3`}>
           <Drama aria-hidden="true" className="size-5" />
-          身份揭晓
+          {t('gameOver.roles')}
         </h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {players.map(player => {
@@ -106,7 +105,7 @@ export default function GameOverPanel() {
                   <Bot aria-hidden="true" className="size-4" />
                 )}
                 <span className={`truncate ${isHuman ? 'text-amber-300' : 'text-white'}`}>
-                  {player.name}
+                  {isHuman ? t('player.you') : t('player.label', { id: player.id })}
                 </span>
                 <RoleIcon role={role.type} className={`ml-auto size-4 ${role.team === 'good' ? goodColor : evilColor}`} />
               </div>
@@ -120,7 +119,7 @@ export default function GameOverPanel() {
         className="w-full bg-amber-500 hover:bg-amber-600"
       >
         <RotateCcw aria-hidden="true" className="mr-2 size-4" />
-        再来一局
+        {t('gameOver.playAgain')}
       </Button>
     </div>
   );

@@ -8,8 +8,10 @@ import { Bot, Swords, Target, User } from 'lucide-react';
 import AISeatStatus from './AISeatStatus';
 import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { panelHeadingClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function AssassinationPanel() {
+  const t = useT();
   const {
     gameState,
     phaseProgress,
@@ -85,6 +87,8 @@ export default function AssassinationPanel() {
       setSeatStatus(playerId, {
         state: 'error',
         message: described.message,
+        messageKey: described.messageKey,
+        params: described.params,
         title: described.title,
         kind: described.kind,
         provider: described.provider ?? provider,
@@ -99,7 +103,6 @@ export default function AssassinationPanel() {
     }
   };
 
-  // AI刺客选择
   useEffect(() => {
     if (!gameState || !assassin || !progressIsCurrent || isHumanAssassin || humanOverride || seatStatus[assassin.id]?.state === 'error') return;
 
@@ -123,20 +126,19 @@ export default function AssassinationPanel() {
     addSystemEvent(`刺客（${modelName}）不可用，由你代为选择刺杀目标`);
   };
 
-  // AI刺客正在选择
   if (!isHumanAssassin && !humanOverride) {
     return (
       <div className="text-center space-y-4">
         <h2 className={`${panelHeadingClass} justify-center text-xl text-rose-400`}>
           <Swords aria-hidden="true" className="size-5" />
-          刺杀阶段
+          {t('assassination.title')}
         </h2>
         <div className="py-8">
           <p className="text-slate-300">
-            好人完成了 3 个任务！
+            {t('assassination.goodThree')}
           </p>
           <p className="text-slate-300 mt-2">
-            但刺客 <span className="text-rose-400">{assassin.name}</span> 有最后一次机会...
+            {t('assassination.aiChance', { name: t('player.label', { id: assassin.id }) })}
           </p>
           {(isAIAssassinating || seatStatus[assassin.id]?.state === 'error') && (
             <div className="mt-4 text-left">
@@ -144,8 +146,8 @@ export default function AssassinationPanel() {
                 playerId={assassin.id}
                 onRetry={() => void requestAITarget(assassin.id)}
                 onSkip={handleSkipAITarget}
-                skipLabel="由你选择"
-                skipHint="由你选择目标"
+                skipLabel={t('assassination.youChoose')}
+                skipHint={t('assassination.youChooseHint')}
               />
             </div>
           )}
@@ -154,25 +156,24 @@ export default function AssassinationPanel() {
     );
   }
 
-  // 人类刺客选择
   return (
     <div className="space-y-4">
       <h2 className={`${panelHeadingClass} text-xl text-rose-400`}>
         <Swords aria-hidden="true" className="size-5" />
-        你是刺客！
+        {t('assassination.youAreAssassin')}
       </h2>
 
       <div className="rounded-lg border border-rose-800 bg-rose-900/20 p-4">
         <p className="text-slate-300 text-sm">
-          好人完成了 3 个任务，但你有最后一次机会！
+          {t('assassination.lastChance')}
         </p>
         <p className="mt-2 text-sm text-rose-300">
-          如果你能正确刺杀梅林，邪恶阵营将逆转获胜！
+          {t('assassination.reverse')}
         </p>
       </div>
 
       <div className="space-y-2">
-        <div className="text-slate-400 text-sm">选择你认为是梅林的玩家:</div>
+        <div className="text-slate-400 text-sm">{t('assassination.chooseMerlin')}</div>
         {goodPlayers.map(player => (
           <button
             key={player.id}
@@ -194,10 +195,10 @@ export default function AssassinationPanel() {
             )}
             <div className="flex flex-col">
               <span className="text-white font-medium">
-                {player.id === humanPlayerId ? '你' : `玩家${player.id}`}
+                {player.id === humanPlayerId ? t('player.you') : t('player.label', { id: player.id })}
               </span>
               <span className="text-xs text-slate-400">
-                {player.id === humanPlayerId ? '人类玩家' : player.aiModel?.name || 'AI'}
+                {player.id === humanPlayerId ? t('common.humanPlayer') : player.aiModel?.name || t('common.ai')}
               </span>
             </div>
           </button>
@@ -211,7 +212,7 @@ export default function AssassinationPanel() {
         className="w-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
       >
         <Target aria-hidden="true" className="mr-2 size-4" />
-        确认刺杀
+        {t('assassination.confirm')}
       </Button>
     </div>
   );

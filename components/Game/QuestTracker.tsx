@@ -2,8 +2,10 @@
 
 import { useGameStore } from '@/lib/game/store';
 import { QUEST_SIZES, DOUBLE_FAIL_QUESTS } from '@/lib/game/types';
+import { useT } from '@/lib/i18n';
 
 export default function QuestTracker() {
+  const t = useT();
   const { gameState } = useGameStore();
 
   if (!gameState) return null;
@@ -24,8 +26,7 @@ export default function QuestTracker() {
           ? Object.values(quest.actions ?? {}).filter(action => !action).length
           : undefined;
 
-        // 确定任务状态的颜色
-        let bgColor = 'bg-slate-700';        // 未进行
+        let bgColor = 'bg-slate-700';
         let borderColor = 'border-slate-600';
         let textColor = 'text-slate-400';
 
@@ -54,35 +55,35 @@ export default function QuestTracker() {
               ${bgColor} ${borderColor}
               ${isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''}
             `}
-            title={`任务${questNumber}: 需要${requiredPlayers}人${needsDoubleFail ? '（需2张失败票）' : ''}`}
+            title={t('tracker.title', {
+              quest: questNumber,
+              count: requiredPlayers,
+              doubleFail: needsDoubleFail ? t('tracker.doubleFailSuffix') : '',
+            })}
           >
-            {/* 任务编号 */}
             <span className={`font-bold ${textColor}`}>
               {questNumber}
             </span>
 
-            {/* 需要的人数 */}
             <span className={`font-bold ${textColor}`}>
-              {requiredPlayers}人
+              {t('tracker.people', { count: requiredPlayers })}
             </span>
 
             {isResolved && (
               <span className={`text-[10px] leading-none ${textColor}`}>
-                {failCount} 失败
+                {t('tracker.failures', { count: failCount ?? 0 })}
               </span>
             )}
 
-            {/* 双失败标记 */}
             {needsDoubleFail && (
               <span
                 className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
-                title="需要2张失败票才会失败"
+                title={t('tracker.doubleFailTitle')}
               >
                 2
               </span>
             )}
 
-            {/* 当前任务指示器 */}
             {isCurrent && (
               <span aria-hidden="true" className="absolute -bottom-1 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-amber-400" />
             )}

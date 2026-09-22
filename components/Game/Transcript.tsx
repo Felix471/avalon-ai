@@ -6,8 +6,11 @@ import { buildQuestSections, type ProposalRecord } from '@/lib/game/history';
 import { useGameStore } from '@/lib/game/store';
 import type { GameEvent, Player } from '@/lib/game/types';
 import { chipClass, panelClass, panelHeadingClass } from './ui';
+import { useLocale, useT } from '@/lib/i18n';
+import { translateGameEvent } from '@/lib/i18n/gameEvents';
 
 function Speaker({ event, players }: { event: GameEvent; players: Player[] }) {
+  const t = useT();
   const player = players.find(candidate => candidate.id === event.playerId);
   const isHuman = player?.isHuman === true;
   const SpeakerIcon = isHuman ? User : Bot;
@@ -20,13 +23,13 @@ function Speaker({ event, players }: { event: GameEvent; players: Player[] }) {
       />
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-medium text-slate-200">玩家{event.playerId ?? '?'}</span>
+          <span className="font-medium text-slate-200">{t('player.label', { id: event.playerId ?? '?' })}</span>
           <span className="text-[10px] text-slate-500">
-            {isHuman ? '人类玩家' : player?.aiModel?.name ?? 'AI'}
+            {isHuman ? t('common.humanPlayer') : player?.aiModel?.name ?? t('common.ai')}
           </span>
         </div>
         <p className="whitespace-pre-wrap break-words text-slate-300">
-          {event.content || '（跳过）'}
+          {event.content || t('transcript.skipped')}
         </p>
       </div>
     </div>
@@ -34,10 +37,11 @@ function Speaker({ event, players }: { event: GameEvent; players: Player[] }) {
 }
 
 function SystemEvent({ event }: { event: GameEvent }) {
+  const { locale } = useLocale();
   return (
     <div className="flex items-start gap-2 text-xs text-slate-400">
       <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>{event.content}</span>
+      <span>{translateGameEvent(event, locale)}</span>
     </div>
   );
 }
@@ -51,9 +55,15 @@ function ProposalBlock({
   precedingEvents: GameEvent[];
   players: Player[];
 }) {
+  const t = useT();
+  const { locale } = useLocale();
   const approveCount = Object.values(proposal.votes).filter(Boolean).length;
   const rejectCount = Object.keys(proposal.votes).length - approveCount;
-  const status = proposal.forced ? '强制' : proposal.passed ? '投票通过' : '投票否决';
+  const status = t(proposal.forced
+    ? 'transcript.forced'
+    : proposal.passed
+      ? 'transcript.passed'
+      : 'transcript.rejected');
   const statusClass = proposal.forced
     ? 'text-amber-300'
     : proposal.passed
@@ -64,8 +74,13 @@ function ProposalBlock({
     <div className="space-y-2 border-l border-slate-700 pl-3">
       <div className="text-xs text-slate-300 tabular-nums">
         <span className="font-medium text-white">
-          第 {proposal.proposalIndex} 次组队 · 队长 玩家{proposal.leaderId} · 队伍{' '}
-          {proposal.team.map(playerId => `玩家${playerId}`).join('、')}
+          {t('transcript.proposal', {
+            proposal: proposal.proposalIndex,
+            leader: t('player.label', { id: proposal.leaderId }),
+            team: proposal.team
+              .map(playerId => t('player.label', { id: playerId }))
+              .join(locale === 'en' ? ', ' : '、'),
+          })}
         </span>
         <span className={`ml-2 ${statusClass}`}>{status}</span>
       </div>
@@ -75,7 +90,7 @@ function ProposalBlock({
       ))}
 
       <div className="text-xs text-slate-400 tabular-nums">
-        {approveCount} 同意 · {rejectCount} 反对
+        {t('transcript.voteCounts', { approve: approveCount, reject: rejectCount })}
       </div>
 
       {precedingEvents.filter(event => event.type === 'system').map(event => (
@@ -86,6 +101,8 @@ function ProposalBlock({
 }
 
 export default function Transcript() {
+  const t = useT();
+  const { locale } = useLocale();
   const { gameState } = useGameStore();
   const [openQuests, setOpenQuests] = useState<Record<number, boolean>>({});
 
@@ -105,13 +122,14 @@ export default function Transcript() {
     <div data-testid="transcript" className={panelClass}>
       <h3 className={`${panelHeadingClass} mb-3`}>
         <MessageCircle aria-hidden="true" className="size-5" />
-        对局实录
+        {t('transcript.title')}
       </h3>
 
       <div className="space-y-2">
         {sections.map(section => {
           const isOpen = openQuests[section.questNumber] ?? section.questNumber === gameState.currentQuest;
           const sectionStart = (previousQuestResultIndices.get(section.questNumber) ?? -1) + 1;
+          const questResultEvent = section.events.find(event => event.type === 'quest_result');
           let previousBoundary = sectionStart;
 
           return (
@@ -129,7 +147,7 @@ export default function Transcript() {
               className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/20"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm text-white">
-                <span className="font-medium tabular-nums">任务 {section.questNumber}</span>
+                <span className="font-medium tabular-nums">{t('transcript.quest', { quest: section.questNumber })}</span>
                 <span className="flex items-center gap-2">
                   {section.result ? (
                     <span
@@ -144,10 +162,12 @@ export default function Transcript() {
                       ) : (
                         <X aria-hidden="true" className="size-3" />
                       )}
-                      {section.failCount ?? 0} 失败
+                      {questResultEvent
+                        ? translateGameEvent(questResultEvent, locale, section.questNumber)
+                        : t('transcript.failCount', { count: section.failCount ?? 0 })}
                     </span>
                   ) : (
-                    <span className="text-xs text-amber-300">进行中</span>
+                    <span className="text-xs text-amber-300">{t('common.inProgress')}</span>
                   )}
                   <ChevronDown aria-hidden="true" className="size-4 text-slate-500" />
                 </span>
@@ -175,7 +195,7 @@ export default function Transcript() {
 
                   return (
                     <div className="space-y-2 border-l border-amber-500/40 pl-3">
-                      <div className="text-xs font-medium text-amber-300">本轮讨论</div>
+                      <div className="text-xs font-medium text-amber-300">{t('transcript.currentDiscussion')}</div>
                       {ongoingDiscussion.map(event => (
                         <Speaker key={event.id} event={event} players={gameState.players} />
                       ))}
@@ -186,6 +206,10 @@ export default function Transcript() {
             </details>
           );
         })}
+
+        {gameState.events.filter(event => event.type === 'assassination').map(event => (
+          <SystemEvent key={event.id} event={event} />
+        ))}
       </div>
     </div>
   );

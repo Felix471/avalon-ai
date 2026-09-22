@@ -8,15 +8,17 @@ import {
   type VariantRules,
 } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
+import LocaleToggle from '@/components/LocaleToggle';
+import { useT } from '@/lib/i18n';
 import {
   Users, Play, Bot, Info, AlertCircle, Trash2, ArrowRight, SlidersHorizontal
 } from 'lucide-react';
 
-// ==================== 大厅主组件 ====================
+// Lobby content
 
 function LobbyContent() {
   const router = useRouter();
-  // 添加 gameState 和 resetGame 用于恢复/重置游戏
+  const t = useT();
   const {
     config,
     updateConfig,
@@ -26,7 +28,6 @@ function LobbyContent() {
     gameState,
     resetGame,
   } = useGameStore();
-  // 添加 hydration 检查
   const hydrated = useHydration();
 
   const handlePlayerCountChange = (count: number) => {
@@ -44,7 +45,6 @@ function LobbyContent() {
     router.push('/game');
   };
 
-  // 检测是否有进行中的游戏
   const hasActiveGame = hydrated && gameState && gameState.phase !== 'game_over';
 
   const playerCounts = [5, 6, 7, 8, 9, 10];
@@ -52,25 +52,24 @@ function LobbyContent() {
   return (
     <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="max-w-4xl mx-auto">
-        {/* 标题 */}
         <div className="text-center py-8">
           <div className="flex items-center justify-center gap-4 mb-2">
             <img
               src="/logo.jpg"
-              alt="AI 阿瓦隆"
+              alt="AI Avalon"
               className="w-12 h-12 rounded-lg object-cover"
             />
-            <h1 className="text-4xl font-bold text-amber-400">AI 阿瓦隆</h1>
+            <h1 className="text-4xl font-bold text-amber-400">{t('app.name')}</h1>
+            <LocaleToggle />
           </div>
-          <p className="text-slate-400">与多个 AI 模型一起玩阿瓦隆桌游</p>
+          <p className="text-slate-400">{t('lobby.subtitle')}</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* 左侧：玩家人数 */}
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-6">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <Users aria-hidden="true" className="size-5 text-amber-400" />
-              玩家人数
+              {t('lobby.playerCount')}
             </h2>
             <div className="grid grid-cols-3 gap-2">
               {playerCounts.map(count => (
@@ -86,12 +85,12 @@ function LobbyContent() {
                     }
                   `}
                 >
-                  {count} 人
+                  {t('player.count', { count })}
                 </button>
               ))}
             </div>
             <p className="text-slate-500 text-sm mt-3">
-              你将作为其中一名玩家参与游戏
+              {t('lobby.playerHint')}
             </p>
           </div>
 
@@ -100,7 +99,7 @@ function LobbyContent() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-xl font-bold text-white">
                 <Bot aria-hidden="true" className="size-5 text-amber-400" />
-                AI 座位 / Seats
+                {t('lobby.aiSeats')}
               </h2>
               <Button
                 type="button"
@@ -110,7 +109,7 @@ function LobbyContent() {
                 onClick={() => setAllSeats(config.seats[0]?.modelId ?? AI_MODELS[0].id)}
                 className="border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700"
               >
-                全部相同
+                {t('lobby.allSame')}
               </Button>
             </div>
             <div className="space-y-2">
@@ -122,7 +121,7 @@ function LobbyContent() {
                     key={index}
                     className="flex items-center gap-3 rounded-lg bg-slate-700/60 p-3"
                   >
-                    <span className="w-16 shrink-0 text-sm text-slate-300">座位 {index + 1}</span>
+                    <span className="w-16 shrink-0 text-sm text-slate-300">{t('player.seat', { id: index + 1 })}</span>
                     <span
                       aria-hidden="true"
                       className="size-3 shrink-0 rounded-full"
@@ -146,11 +145,11 @@ function LobbyContent() {
             <details data-testid="advanced-settings" className="mt-5 border-t border-slate-700 pt-4">
               <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-slate-200">
                 <SlidersHorizontal aria-hidden="true" className="size-4 text-amber-400" />
-                高级设置
+                {t('lobby.advanced')}
               </summary>
               <div className="mt-4 space-y-5">
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-slate-300">提示词模式</legend>
+                  <legend className="text-sm font-medium text-slate-300">{t('lobby.promptMode')}</legend>
                   <div className="flex flex-wrap gap-x-5 gap-y-2">
                     <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
                       <input
@@ -162,7 +161,7 @@ function LobbyContent() {
                         onChange={() => updateConfig({ promptMode: 'full' })}
                         className="accent-amber-500"
                       />
-                      完整策略
+                      {t('lobby.promptFull')}
                     </label>
                     <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
                       <input
@@ -174,17 +173,17 @@ function LobbyContent() {
                         onChange={() => updateConfig({ promptMode: 'naive' })}
                         className="accent-amber-500"
                       />
-                      基础
+                      {t('lobby.promptNaive')}
                     </label>
                   </div>
-                  <p className="text-xs text-slate-500">基础模式是实验中的对照组。</p>
+                  <p className="text-xs text-slate-500">{t('lobby.promptNaiveHint')}</p>
                 </fieldset>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <label htmlFor="temperature" className="font-medium text-slate-300">温度</label>
+                    <label htmlFor="temperature" className="font-medium text-slate-300">{t('lobby.temperature')}</label>
                     <span className="tabular-nums text-slate-400">
-                      {config.generation.temperature ?? '提供方默认'}
+                      {config.generation.temperature ?? t('lobby.providerDefault')}
                     </span>
                   </div>
                   <input
@@ -216,12 +215,12 @@ function LobbyContent() {
                       })}
                       className="accent-amber-500"
                     />
-                    使用提供方默认
+                    {t('lobby.useProviderDefault')}
                   </label>
                 </div>
 
                 <label className="block space-y-2 text-sm">
-                  <span className="font-medium text-slate-300">最大输出 tokens</span>
+                  <span className="font-medium text-slate-300">{t('lobby.maxTokens')}</span>
                   <input
                     type="number"
                     min={GENERATION_LIMITS.maxTokens.min}
@@ -249,24 +248,22 @@ function LobbyContent() {
                     onChange={event => updateConfig({ quickMode: event.target.checked })}
                     className="mt-0.5 accent-amber-500"
                   />
-                  每次组队只讨论一轮（更快、更便宜）
+                  {t('lobby.quickMode')}
                 </label>
               </div>
             </details>
           </div>
         </div>
 
-        {/* 变体规则 */}
         <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700 p-6">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Info aria-hidden="true" className="size-5 text-amber-400" />
-            游戏规则变体
+            {t('lobby.variants')}
           </h2>
 
           <div className="grid md:grid-cols-3 gap-4">
-            {/* 刺客规则 */}
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm font-medium">刺客开刀时机</label>
+              <label className="text-slate-300 text-sm font-medium">{t('lobby.assassinTiming')}</label>
               <div className="space-y-1">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -276,7 +273,7 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('assassinAnytime', false)}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">好人3胜后开刀</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.assassinAfterThree')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -286,14 +283,13 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('assassinAnytime', true)}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">随时可开刀</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.assassinAnytime')}</span>
                 </label>
               </div>
             </div>
 
-            {/* 发言规则 */}
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm font-medium">发言阶段</label>
+              <label className="text-slate-300 text-sm font-medium">{t('lobby.discussionRule')}</label>
               <div className="space-y-1">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -303,7 +299,7 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('discussionMode', 'every_time')}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">每次组队前发言</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.discussionEvery')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -313,14 +309,13 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('discussionMode', 'first_only')}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">仅首次组队前发言</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.discussionFirst')}</span>
                 </label>
               </div>
             </div>
 
-            {/* 第五次投票规则 */}
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm font-medium">连续5次否决</label>
+              <label className="text-slate-300 text-sm font-medium">{t('lobby.fifthVote')}</label>
               <div className="space-y-1">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -330,7 +325,7 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('fifthVoteRule', 'force_team')}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">第5次强制发车</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.forceFifth')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -340,25 +335,22 @@ function LobbyContent() {
                     onChange={() => handleVariantChange('fifthVoteRule', 'evil_wins')}
                     className="text-amber-500"
                   />
-                  <span className="text-slate-400 text-sm">坏人直接获胜</span>
+                  <span className="text-slate-400 text-sm">{t('lobby.evilWinsFifth')}</span>
                 </label>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 开始游戏按钮区域 */}
         <div className="mt-6">
-          {/* [新增] 检测到未完成游戏的提示框 */}
           {hasActiveGame && (
             <div className="bg-amber-900/50 border border-amber-600 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex items-start gap-3 mb-3">
                 <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-400" />
                 <div className="text-left">
-                  <p className="font-bold text-amber-400">检测到未完成的游戏</p>
+                  <p className="font-bold text-amber-400">{t('lobby.activeTitle')}</p>
                   <p className="text-slate-300 text-sm mt-1">
-                    当前有一局游戏正在进行中（第 {gameState.currentQuest} 轮）。
-                    如果开始新游戏，当前进度将丢失。
+                    {t('lobby.activeDescription', { quest: gameState.currentQuest })}
                   </p>
                 </div>
               </div>
@@ -368,7 +360,7 @@ function LobbyContent() {
                   className="flex-1 bg-green-600 hover:bg-green-500 border-none"
                 >
                   <ArrowRight aria-hidden="true" className="mr-2 size-4" />
-                  继续游戏
+                  {t('lobby.continue')}
                 </Button>
                 <Button
                   variant="outline"
@@ -376,29 +368,25 @@ function LobbyContent() {
                   className="flex-1 border-red-500/30 text-red-400 hover:bg-red-950/30 hover:text-red-300 hover:border-red-500/50"
                 >
                   <Trash2 aria-hidden="true" className="mr-2 size-4" />
-                  放弃并开始新游戏
+                  {t('lobby.abandon')}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* 如果有未完成的游戏，可以考虑禁用下面的按钮，或者保留让用户强制覆盖 */}
           <div className="text-center">
             <Button
               data-testid="lobby-start"
               onClick={handleStartGame}
               size="lg"
-              // 如果有游戏正在进行，将主要按钮样式稍微降级，或者保持原样。
-              // 这里保持原样，用户点击会直接覆盖旧游戏
               className="bg-amber-600 hover:bg-amber-500 text-lg px-8 py-6 w-full md:w-auto"
             >
               <Play aria-hidden="true" className="mr-2 size-5" />
-              {hasActiveGame ? '覆盖并开始新游戏' : '开始游戏'}
+              {hasActiveGame ? t('lobby.overwrite') : t('lobby.start')}
             </Button>
           </div>
         </div>
 
-        {/* 底部信息 */}
         <div className="mt-8 text-center text-slate-500 text-sm">
           <p>Ziyi (Felix) Wang · <a href="https://github.com/Felix471/avalon-ai" className="underline hover:text-slate-300">GitHub</a></p>
         </div>
@@ -407,15 +395,16 @@ function LobbyContent() {
   );
 }
 
-// ==================== 主页面 ====================
+// Page shell
 
 export default function HomePage() {
   const hydrated = useHydration();
+  const t = useT();
 
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
-        <div className="text-white text-xl">正在加载...</div>
+        <div className="text-white text-xl">{t('lobby.loading')}</div>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { useSyncExternalStore } from 'react';
+import type { TranslationKey, TranslationParams } from '@/lib/i18n';
 import {
   GameState, GameConfig, GamePhase, AI_MODELS, VariantRules,
   DEFAULT_GENERATION, DISCUSSION_ROUNDS, SeatConfig
@@ -32,6 +33,8 @@ export type SeatStatus =
   | {
       state: 'error';
       message: string;
+      messageKey?: TranslationKey;
+      params?: TranslationParams;
       title: string;
       provider?: string;
       modelName?: string;

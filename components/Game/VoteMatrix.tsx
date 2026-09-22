@@ -4,8 +4,10 @@ import { Check, Crown, User, Vote, X } from 'lucide-react';
 import { buildProposalHistory } from '@/lib/game/history';
 import { useGameStore } from '@/lib/game/store';
 import { panelClass, panelHeadingClass, subtleTextClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function VoteMatrix() {
+  const t = useT();
   const { gameState } = useGameStore();
 
   if (!gameState) return null;
@@ -28,18 +30,18 @@ export default function VoteMatrix() {
     <div data-testid="vote-matrix" className={panelClass}>
       <h3 className={`${panelHeadingClass} mb-3`}>
         <Vote aria-hidden="true" className="size-5" />
-        投票矩阵
+        {t('matrix.title')}
       </h3>
 
       {proposals.length === 0 ? (
-        <p className={`${subtleTextClass} text-slate-500`}>暂无投票历史</p>
+        <p className={`${subtleTextClass} text-slate-500`}>{t('matrix.empty')}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
             <thead>
               <tr className="text-slate-300">
                 <th rowSpan={2} className="sticky left-0 z-10 bg-slate-800 px-2 py-1 text-left font-medium">
-                  玩家
+                  {t('matrix.player')}
                 </th>
                 {questGroups.map(group => (
                   <th
@@ -47,7 +49,7 @@ export default function VoteMatrix() {
                     colSpan={group.count}
                     className="border-b border-slate-700 px-1 py-1 text-center font-medium"
                   >
-                    任务 {group.questNumber}
+                    {t('matrix.quest', { quest: group.questNumber })}
                   </th>
                 ))}
               </tr>
@@ -58,9 +60,9 @@ export default function VoteMatrix() {
                     className={`min-w-12 px-1 py-1 text-center font-normal ${
                       proposal.passed ? 'text-slate-300' : 'text-slate-500'
                     }`}
-                    title={`第 ${proposal.proposalIndex} 次组队，队长玩家${proposal.leaderId}`}
+                    title={t('matrix.proposalTitle', { proposal: proposal.proposalIndex, leader: proposal.leaderId })}
                   >
-                    <span className="block">{proposal.forced ? '强制' : `第 ${proposal.proposalIndex} 次`}</span>
+                    <span className="block">{proposal.forced ? t('matrix.forced') : t('matrix.proposal', { proposal: proposal.proposalIndex })}</span>
                     <span className="inline-flex items-center gap-0.5">
                       <Crown aria-hidden="true" className="size-3" />
                       {proposal.leaderId}
@@ -75,23 +77,25 @@ export default function VoteMatrix() {
                   <th className="sticky left-0 z-10 whitespace-nowrap bg-slate-800 px-2 py-1 text-left font-normal text-slate-300">
                     <span className="inline-flex items-center gap-1">
                       {player.isHuman && <User aria-hidden="true" className="size-3 text-amber-300" />}
-                      <span>玩家{player.id}</span>
+                      <span>{t('player.label', { id: player.id })}</span>
                       <span className="max-w-24 truncate text-[10px] text-slate-500">
-                        {player.isHuman ? '人类' : player.aiModel?.name ?? 'AI'}
+                        {player.isHuman ? t('common.human') : player.aiModel?.name ?? t('common.ai')}
                       </span>
                     </span>
                   </th>
                   {proposals.map(proposal => {
                     const playerVote = proposal.votes[player.id];
                     const onTeam = proposal.team.includes(player.id);
-                    const voteLabel = playerVote === undefined ? '无投票' : playerVote ? '同意' : '反对';
+                    const voteLabel = playerVote === undefined
+                      ? t('matrix.noVote')
+                      : t(playerVote ? 'vote.approve' : 'vote.reject');
 
                     return (
                       <td
                         key={proposal.eventIndex}
                         data-testid="vote-cell"
                         data-vote={playerVote === undefined ? 'none' : playerVote ? 'approve' : 'reject'}
-                        aria-label={`玩家${player.id}：${voteLabel}`}
+                        aria-label={`${t('player.label', { id: player.id })}: ${voteLabel}`}
                         className={`size-6 min-w-6 p-0 text-center ${onTeam ? 'bg-slate-700/60' : ''}`}
                       >
                         <span className="inline-flex size-6 items-center justify-center">

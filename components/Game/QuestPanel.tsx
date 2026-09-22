@@ -9,8 +9,10 @@ import { AlertTriangle, Bot, Check, CheckCircle, Swords, User, XCircle } from 'l
 import AISeatStatus from './AISeatStatus';
 import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { chipClass, panelClass, panelHeadingClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function QuestPanel() {
+  const t = useT();
   const { gameState, questAction, addSystemEvent, seatStatus, setSeatStatus } = useGameStore();
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -83,6 +85,8 @@ export default function QuestPanel() {
       setSeatStatus(playerId, {
         state: 'error',
         message: described.message,
+        messageKey: described.messageKey,
+        params: described.params,
         title: described.title,
         kind: described.kind,
         provider: described.provider ?? provider,
@@ -98,7 +102,6 @@ export default function QuestPanel() {
     }
   };
 
-  // AI执行任务
   useEffect(() => {
     if (!gameState || isProcessingAI) return;
 
@@ -138,19 +141,17 @@ export default function QuestPanel() {
     setRetryVersion(version => version + 1);
   };
 
-  // 统计已行动人数
   const actedCount = Object.keys(quest.actions || {}).length;
 
   return (
     <div className="space-y-4">
       <h2 className={`${panelHeadingClass} text-xl tabular-nums`}>
         <Swords aria-hidden="true" className="size-5" />
-        执行任务 {currentQuest}
+        {t('quest.title', { quest: currentQuest })}
       </h2>
 
-      {/* 任务队员 */}
       <div className={panelClass}>
-        <div className="text-slate-400 text-sm mb-2">任务队伍:</div>
+        <div className="text-slate-400 text-sm mb-2">{t('quest.team')}</div>
         <div className="flex flex-wrap gap-2">
           {teamMembers.map(player => {
             const acted = quest.actions?.[player.id] !== undefined;
@@ -170,7 +171,7 @@ export default function QuestPanel() {
                 ) : (
                   <Bot aria-hidden="true" className="size-4" />
                 )}
-                {player.name}
+                {player.id === humanPlayerId ? t('player.you') : t('player.label', { id: player.id })}
                 {acted && <CheckCircle aria-hidden="true" className="size-4" />}
               </span>
             );
@@ -178,15 +179,13 @@ export default function QuestPanel() {
         </div>
       </div>
 
-      {/* 人类行动 */}
       {humanOnTeam && !humanHasActed ? (
         <div className="space-y-3">
           <p className="text-slate-300 text-sm">
-            你被选中执行任务。选择你的行动：
+            {t('quest.actionQuestion')}
           </p>
 
           {humanIsEvil ? (
-            // 坏人可以选择
             <div className="space-y-2">
               <Button
                 data-testid="quest-success"
@@ -194,7 +193,7 @@ export default function QuestPanel() {
                 className="w-full bg-sky-600 hover:bg-sky-700"
               >
                 <CheckCircle aria-hidden="true" className="mr-2 size-4" />
-                任务成功（伪装好人）
+                {t('quest.evilSuccess')}
               </Button>
               <Button
                 data-testid="quest-fail"
@@ -202,15 +201,14 @@ export default function QuestPanel() {
                 className="w-full bg-rose-600 hover:bg-rose-700"
               >
                 <XCircle aria-hidden="true" className="mr-2 size-4" />
-                任务失败（破坏任务）
+                {t('quest.fail')}
               </Button>
               <p className="flex items-center justify-center gap-1 text-center text-xs text-slate-500">
                 <AlertTriangle aria-hidden="true" className="size-4" />
-                选择失败可能会暴露你的身份
+                {t('quest.failWarning')}
               </p>
             </div>
           ) : (
-            // 好人只能成功
             <div className="space-y-2">
               <Button
                 data-testid="quest-success"
@@ -218,10 +216,10 @@ export default function QuestPanel() {
                 className="w-full bg-sky-600 hover:bg-sky-700"
               >
                 <CheckCircle aria-hidden="true" className="mr-2 size-4" />
-                任务成功
+                {t('quest.success')}
               </Button>
               <p className="text-slate-500 text-xs text-center">
-                作为好人，你必须让任务成功
+                {t('quest.goodMustSucceed')}
               </p>
             </div>
           )}
@@ -230,12 +228,12 @@ export default function QuestPanel() {
         <div className="text-center py-2">
           <p className="flex items-center justify-center gap-1 text-green-400">
             <Check aria-hidden="true" className="size-4" />
-            你已完成行动
+            {t('quest.actionComplete')}
           </p>
         </div>
       ) : (
         <div className="text-center py-4 text-slate-400">
-          你不在本次任务队伍中，等待结果...
+          {t('quest.notOnTeam')}
         </div>
       )}
 
@@ -248,14 +246,13 @@ export default function QuestPanel() {
           playerId={player.id}
           onRetry={() => void handleRetryAIQuestAction(player.id)}
           onSkip={() => handleSkipAIQuestAction(player.id)}
-          skipHint="任务按成功计"
+          skipHint={t('quest.skipHint')}
         />
       ))}
 
-      {/* 进度 */}
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-slate-400">行动进度</span>
+          <span className="text-slate-400">{t('quest.progress')}</span>
           <span className="text-slate-300 tabular-nums">{actedCount} / {teamMembers.length}</span>
         </div>
         <div className="w-full bg-slate-700 rounded-full h-2">
@@ -269,13 +266,13 @@ export default function QuestPanel() {
       {quest.requiresDoubleFail && (
         <div className="flex items-center justify-center gap-1 text-center text-sm text-yellow-400 tabular-nums">
           <AlertTriangle aria-hidden="true" className="size-4" />
-          本任务需要 2 张失败票才会失败
+          {t('quest.doubleFail')}
         </div>
       )}
 
       {actedCount > 0 && actedCount < teamMembers.length && (
         <div className="text-center text-slate-400 text-sm">
-          等待其他队员行动...
+          {t('quest.waiting')}
         </div>
       )}
     </div>

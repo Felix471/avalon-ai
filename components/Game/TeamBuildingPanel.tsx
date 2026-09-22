@@ -9,8 +9,10 @@ import { AlertTriangle, Bot, Crown, Target, User } from 'lucide-react';
 import AISeatStatus from './AISeatStatus';
 import { describeAIError, readAIResponse, readLatency } from './aiResponse';
 import { panelHeadingClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function TeamBuildingPanel() {
+  const t = useT();
   const {
     gameState,
     phaseProgress,
@@ -90,6 +92,8 @@ export default function TeamBuildingPanel() {
       setSeatStatus(playerId, {
         state: 'error',
         message: described.message,
+        messageKey: described.messageKey,
+        params: described.params,
         title: described.title,
         kind: described.kind,
         provider: described.provider ?? provider,
@@ -104,7 +108,6 @@ export default function TeamBuildingPanel() {
     }
   };
 
-  // AI队长自动选队
   useEffect(() => {
     if (!gameState || !leader || !progressIsCurrent || isHumanLeader || humanOverride || isAISelecting || seatStatus[leader.id]?.state === 'error') return;
 
@@ -137,22 +140,21 @@ export default function TeamBuildingPanel() {
     addSystemEvent(`队长 玩家${leader.id}（${modelName}）不可用，由你代为组队`);
   };
 
-  // AI队长界面
   if (!isHumanLeader && !humanOverride) {
     return (
       <div className="space-y-4">
         <h2 className={`${panelHeadingClass} text-xl`}>
           <Target aria-hidden="true" className="size-5" />
-          组建队伍
+          {t('team.title')}
         </h2>
 
         {isForced && (
           <div className="p-3 bg-red-900/30 border border-red-500 rounded-lg">
             <p className="flex items-center gap-1 font-bold text-rose-300">
               <AlertTriangle aria-hidden="true" className="size-4" />
-              强制发车！
+              {t('team.forced')}
             </p>
-            <p className="text-slate-400 text-sm">第5次组队，队长直接指定队伍执行任务</p>
+            <p className="text-slate-400 text-sm">{t('team.forcedAIHint')}</p>
           </div>
         )}
 
@@ -160,27 +162,26 @@ export default function TeamBuildingPanel() {
           playerId={leader.id}
           onRetry={() => void requestAITeam(leader.id)}
           onSkip={handleSkipAITeam}
-          skipLabel="由你组队"
-          skipHint="由你组队"
+          skipLabel={t('team.youChoose')}
+          skipHint={t('team.youChoose')}
         />
 
         <div className="text-slate-400 text-sm text-center">
-          需要选择 {requiredSize} 人执行任务
+          {t('team.required', { count: requiredSize })}
         </div>
       </div>
     );
   }
 
-  // 人类队长界面
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className={`${panelHeadingClass} text-xl`}>
           <Target aria-hidden="true" className="size-5" />
-          组建队伍
+          {t('team.title')}
         </h2>
         <div className="rounded bg-slate-700/50 px-2 py-1 text-xs text-slate-400 tabular-nums">
-          第{consecutiveRejects + 1}次组队
+          {t('team.proposalNumber', { count: consecutiveRejects + 1 })}
         </div>
       </div>
 
@@ -188,20 +189,19 @@ export default function TeamBuildingPanel() {
         <div className="p-3 bg-red-900/30 border border-red-500 rounded-lg">
           <p className="flex items-center gap-1 font-bold text-rose-300">
             <AlertTriangle aria-hidden="true" className="size-4" />
-            强制发车！
+            {t('team.forced')}
           </p>
-          <p className="text-slate-400 text-sm">第5次组队，你可以直接指定队伍执行任务，无需投票</p>
+          <p className="text-slate-400 text-sm">{t('team.forcedHumanHint')}</p>
         </div>
       )}
 
       <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg">
         <p className="flex items-center gap-1 text-amber-300">
           <Crown aria-hidden="true" className="size-4" />
-          <span>你是本轮队长！选择 <span className="font-bold tabular-nums">{requiredSize}</span> 名队员</span>
+          <span>{t('team.humanLeader', { count: requiredSize })}</span>
         </p>
       </div>
 
-      {/* 玩家选择列表 */}
       <div className="grid grid-cols-2 gap-2">
         {players.map(player => {
           const isHuman = player.id === humanPlayerId;
@@ -234,16 +234,15 @@ export default function TeamBuildingPanel() {
                 ) : (
                   <Bot aria-hidden="true" className="size-4" />
                 )}
-                玩家{player.id}
+                {t('player.label', { id: player.id })}
               </span>
             </label>
           );
         })}
       </div>
 
-      {/* 已选计数 */}
       <div className="text-center text-sm text-slate-400 tabular-nums">
-        已选择 {selectedPlayers.length} / {requiredSize}
+        {t('team.selected', { selected: selectedPlayers.length, required: requiredSize })}
       </div>
 
       <Button
@@ -252,7 +251,7 @@ export default function TeamBuildingPanel() {
         disabled={selectedPlayers.length !== requiredSize}
         className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50"
       >
-        {isForced ? '确认队伍，直接执行任务' : '确认队伍，开始投票'}
+        {t(isForced ? 'team.confirmForced' : 'team.confirmVote')}
       </Button>
     </div>
   );

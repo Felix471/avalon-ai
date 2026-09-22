@@ -8,8 +8,10 @@ import { AlertTriangle, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RoleIcon } from './roleIcon';
 import { panelClass } from './ui';
+import { useT, type TranslationKey } from '@/lib/i18n';
 
 export default function VisionPanel() {
+  const t = useT();
   const { gameState } = useGameStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -28,30 +30,29 @@ export default function VisionPanel() {
 
   if (!hasSpecialVision) return null;
 
-  // 生成紧凑的视野信息
-  const getVisionSummary = () => {
+  const getVisionSummary = (): { label: TranslationKey; players: number[]; color: 'rose' | 'sky'; hint: TranslationKey } | null => {
     if (vision.knownEvil.length > 0 && humanPlayer.role === 'merlin') {
       return {
-        label: '已知邪恶',
+        label: 'vision.knownEvil',
         players: vision.knownEvil,
         color: 'rose',
-        hint: '莫德雷德对你隐身',
+        hint: 'vision.mordredHidden',
       };
     }
     if (vision.knownMerlinOrMorgana.length > 0) {
       return {
-        label: '梅林/莫甘娜',
+        label: 'vision.merlinOrMorgana',
         players: vision.knownMerlinOrMorgana,
         color: 'sky',
-        hint: '需要分辨真假',
+        hint: 'vision.distinguish',
       };
     }
     if (vision.teammates.length > 0) {
       return {
-        label: '邪恶同伴',
+        label: 'vision.teammates',
         players: vision.teammates,
         color: 'rose',
-        hint: '奥伯伦隐身',
+        hint: 'vision.oberonHidden',
       };
     }
     return null;
@@ -73,7 +74,7 @@ export default function VisionPanel() {
       >
         <div className="flex items-center gap-2">
           <RoleIcon role={role.type} className="size-4" />
-          <span className="text-sm font-medium">{role.name}的视野</span>
+          <span className="text-sm font-medium">{t('vision.title', { role: t(`role.${role.type}.name`) })}</span>
         </div>
         <div className="flex items-center gap-1">
           <Eye aria-hidden="true" className="size-4" />
@@ -88,7 +89,7 @@ export default function VisionPanel() {
       {!isCollapsed && (
         <div className="px-3 pb-2 border-t border-current/20">
           <div className="pt-2 space-y-1">
-            <div className="text-xs opacity-80">{visionInfo.label}:</div>
+            <div className="text-xs opacity-80">{t(visionInfo.label)}:</div>
             <div className="flex flex-wrap gap-1">
               {visionInfo.players.map(id => {
                 const player = gameState.players.find(p => p.id === id);
@@ -98,14 +99,14 @@ export default function VisionPanel() {
                     key={id}
                     className="px-2 py-0.5 bg-black/30 rounded text-xs"
                   >
-                    P{id} ({player.aiModel?.name || '人类'})
+                    {t('player.label', { id })} ({player.aiModel?.name || t('common.human')})
                   </span>
                 );
               })}
             </div>
             <p className="flex items-center gap-1 text-xs italic opacity-60">
               <AlertTriangle aria-hidden="true" className="size-4" />
-              {visionInfo.hint}
+              {t(visionInfo.hint)}
             </p>
           </div>
         </div>

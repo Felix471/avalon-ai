@@ -6,8 +6,10 @@ import { ROLES } from '@/lib/game/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertTriangle, Bot, Swords, Target, User } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 export default function AssassinFloatingButton() {
+  const t = useT();
   const { gameState, assassinate } = useGameStore();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<number | null>(null);
@@ -18,12 +20,10 @@ export default function AssassinFloatingButton() {
   const { players, humanPlayerId, variantRules, phase, goodWins } = gameState;
   const humanPlayer = players.find(p => p.id === humanPlayerId)!;
 
-  // 检查是否显示刺客按钮
   const isAssassin = humanPlayer.role === 'assassin';
   const canAssassinateAnytime = variantRules?.assassinAnytime;
   const gameInProgress = phase !== 'game_over' && phase !== 'assassination' && phase !== 'role_reveal';
 
-  // 不显示的条件：不是刺客、没开启随时开刀、游戏已结束、已经在刺杀阶段
   if (!isAssassin || !canAssassinateAnytime || !gameInProgress) {
     return null;
   }
@@ -59,7 +59,6 @@ export default function AssassinFloatingButton() {
 
   return (
     <>
-      {/* 浮动按钮 */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           onClick={handleOpenDialog}
@@ -70,47 +69,44 @@ export default function AssassinFloatingButton() {
             animate-pulse hover:animate-none
             transition-all hover:scale-110
           "
-          title="刺杀梅林"
+          title={t('assassin.buttonTitle')}
         >
           <Swords aria-hidden="true" className="size-5" />
         </Button>
         <div className="absolute -right-1 -top-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-black">
-          刺客
+          {t('role.assassin.name')}
         </div>
       </div>
 
-      {/* 刺杀对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md border-rose-700 bg-slate-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-400">
               <Swords aria-hidden="true" className="size-5" />
-              {confirmStep ? '确认刺杀' : '选择刺杀目标'}
+              {t(confirmStep ? 'assassination.confirm' : 'assassin.selectTarget')}
             </DialogTitle>
             <DialogDescription className="text-slate-400">
               {confirmStep
-                ? '此操作不可撤销！确定要现在刺杀吗？'
-                : '选择你认为是梅林的玩家。注意：刺杀后游戏立即结束！'
+                ? t('assassin.irreversible')
+                : t('assassin.selectHint')
               }
             </DialogDescription>
           </DialogHeader>
 
-          {/* 警告信息 */}
           <div className="p-3 bg-yellow-900/30 rounded-lg border border-yellow-700 flex items-start gap-2">
             <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-yellow-500" />
             <div className="text-sm">
-              <div className="text-yellow-400 font-medium">警告</div>
+              <div className="text-yellow-400 font-medium">{t('common.warning')}</div>
               <div className="text-yellow-200/70">
                 {confirmStep
-                  ? `你即将刺杀 玩家${selectedTarget}。如果猜中梅林，坏人获胜；如果猜错，好人获胜！`
-                  : `当前比分：好人 ${goodWins} 胜。提前刺杀意味着放弃继续破坏任务的机会。`
+                  ? t('assassin.confirmWarning', { player: t('player.label', { id: selectedTarget ?? '' }) })
+                  : t('assassin.scoreWarning', { wins: goodWins })
                 }
               </div>
             </div>
           </div>
 
           {!confirmStep ? (
-            /* 选择目标 */
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {goodPlayers.map(player => (
                 <button
@@ -129,36 +125,36 @@ export default function AssassinFloatingButton() {
                   )}
                   <div className="flex flex-col">
                     <span className="text-white font-medium">
-                      玩家{player.id}
+                      {t('player.label', { id: player.id })}
                     </span>
                     <span className="text-xs text-slate-400">
-                      {player.aiModel?.name || '人类玩家'}
+                      {player.aiModel?.name || t('common.humanPlayer')}
                     </span>
                   </div>
                 </button>
               ))}
             </div>
           ) : (
-            /* 确认步骤 */
             <div className="text-center py-4">
               <div className="flex items-center justify-center gap-2 text-lg text-white">
                 <Target aria-hidden="true" className="size-5 text-rose-400" />
-                目标：<span className="font-bold text-rose-400">玩家{selectedTarget}</span>
+                <span className="font-bold text-rose-400">
+                  {t('assassin.target', { player: t('player.label', { id: selectedTarget ?? '' }) })}
+                </span>
               </div>
               <div className="text-slate-400 text-sm mt-1">
-                {players.find(p => p.id === selectedTarget)?.aiModel?.name || '人类玩家'}
+                {players.find(p => p.id === selectedTarget)?.aiModel?.name || t('common.humanPlayer')}
               </div>
             </div>
           )}
 
-          {/* 按钮 */}
           <div className="flex gap-3 mt-2">
             <Button
               variant="outline"
               onClick={handleCancel}
               className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              {confirmStep ? '返回' : '取消'}
+              {t(confirmStep ? 'common.back' : 'common.cancel')}
             </Button>
             {confirmStep && (
               <Button
@@ -166,7 +162,7 @@ export default function AssassinFloatingButton() {
                 className="flex-1 bg-rose-600 hover:bg-rose-700"
               >
                 <Swords aria-hidden="true" className="mr-2 size-4" />
-                确认刺杀
+                {t('assassination.confirm')}
               </Button>
             )}
           </div>

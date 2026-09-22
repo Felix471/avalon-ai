@@ -5,6 +5,7 @@ import { AlertTriangle, Bot, Loader2, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGameStore } from '@/lib/game/store';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 import { panelClass } from './ui';
 
 interface AISeatStatusProps {
@@ -19,9 +20,10 @@ export default function AISeatStatus({
   playerId,
   onRetry,
   onSkip,
-  skipLabel = '跳过',
+  skipLabel,
   skipHint,
 }: AISeatStatusProps) {
+  const t = useT();
   const status = useGameStore(state => state.seatStatus[playerId]);
   const player = useGameStore(state => state.gameState?.players.find(candidate => candidate.id === playerId));
   const [now, setNow] = useState(() => Date.now());
@@ -47,11 +49,11 @@ export default function AISeatStatus({
       <div className={cn(panelClass, 'flex items-center gap-3 bg-slate-800/70 p-3')} title={provider}>
         <Bot aria-hidden="true" className="size-5 shrink-0 text-slate-300" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-white">玩家{playerId}</div>
+          <div className="text-sm font-medium text-white">{t('player.label', { id: playerId })}</div>
           <div className="truncate text-xs text-slate-400">{modelName}</div>
         </div>
         <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin text-amber-400" />
-        <span className="text-sm text-slate-400 tabular-nums">思考中 · {elapsedSeconds} s</span>
+        <span className="text-sm text-slate-400 tabular-nums">{t('seat.thinking', { seconds: elapsedSeconds })}</span>
       </div>
     );
   }
@@ -60,7 +62,7 @@ export default function AISeatStatus({
     return (
       <div className={cn(panelClass, 'flex items-center gap-2 bg-slate-800/70 p-3 text-sm text-slate-500')}>
         <SkipForward aria-hidden="true" className="size-4" />
-        <span>玩家{playerId} · 已跳过</span>
+        <span>{t('seat.skipped', { player: t('player.label', { id: playerId }) })}</span>
       </div>
     );
   }
@@ -85,8 +87,10 @@ export default function AISeatStatus({
       <div className="flex items-start gap-3">
         <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-rose-400" />
         <div className="min-w-0">
-          <div className="text-sm font-medium text-amber-300">玩家{playerId} ({modelName})</div>
-          <div className="text-sm text-rose-400">{status.message}</div>
+          <div className="text-sm font-medium text-amber-300">{t('player.label', { id: playerId })} ({modelName})</div>
+          <div className="text-sm text-rose-400">
+            {status.messageKey ? t(status.messageKey, status.params) : status.message}
+          </div>
         </div>
       </div>
       <div className="flex gap-2">
@@ -98,7 +102,7 @@ export default function AISeatStatus({
             onClick={onRetry}
             disabled={retrySeconds > 0}
           >
-            {retrySeconds > 0 ? `重试 (${retrySeconds})` : '重试'}
+            {retrySeconds > 0 ? t('seat.retryCountdown', { seconds: retrySeconds }) : t('seat.retry')}
           </Button>
         )}
         {onSkip && (
@@ -109,7 +113,7 @@ export default function AISeatStatus({
             onClick={onSkip}
             title={skipHint}
           >
-            {skipLabel}
+            {skipLabel ?? t('seat.skip')}
           </Button>
         )}
       </div>

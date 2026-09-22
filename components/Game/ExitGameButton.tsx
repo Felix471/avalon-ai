@@ -12,9 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useT } from '@/lib/i18n';
 
 export function ExitGameButton() {
   const router = useRouter();
+  const t = useT();
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleExit = () => {
@@ -22,8 +24,6 @@ export function ExitGameButton() {
   };
 
   const confirmExit = () => {
-    // 直接返回主页，游戏状态保留在 store 中
-    // 主页会检测到进行中的游戏并显示"是否继续"提示
     router.push('/play');
   };
 
@@ -36,15 +36,15 @@ export function ExitGameButton() {
         className="text-slate-400 hover:text-white hover:bg-slate-700"
       >
         <LogOut aria-hidden="true" className="mr-1 size-4" />
-        退出
+        {t('exit.button')}
       </Button>
 
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white">
           <DialogHeader>
-            <DialogTitle>确认退出游戏？</DialogTitle>
+            <DialogTitle>{t('exit.title')}</DialogTitle>
             <DialogDescription className="text-slate-400">
-              游戏进度会被保存，你可以稍后重新进入游戏。
+              {t('exit.description')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -53,13 +53,13 @@ export function ExitGameButton() {
               onClick={() => setShowConfirm(false)}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              取消
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={confirmExit}
               className="bg-amber-600 hover:bg-amber-500"
             >
-              退出到主页
+              {t('exit.home')}
             </Button>
           </DialogFooter>
         </DialogContent>

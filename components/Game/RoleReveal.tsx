@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Drama, Eye, Handshake, ShieldCheck, Skull, Swords } from 'lucide-react';
 import { RoleIcon } from './roleIcon';
 import { evilColor, goodColor, panelHeadingClass } from './ui';
+import { useT } from '@/lib/i18n';
 
 export default function RoleReveal() {
+  const t = useT();
   const { gameState, setPhase } = useGameStore();
 
   if (!gameState) return null;
@@ -27,10 +29,9 @@ export default function RoleReveal() {
     <div className="text-center space-y-4">
       <h2 className={`${panelHeadingClass} justify-center text-xl`}>
         <Drama aria-hidden="true" className="size-5" />
-        你的身份
+        {t('roleReveal.title')}
       </h2>
 
-      {/* 角色卡片 */}
       <div className={`
         p-6 rounded-xl border-2
         ${role.team === 'good' 
@@ -40,7 +41,7 @@ export default function RoleReveal() {
       `}>
         <RoleIcon role={role.type} className={`mx-auto mb-2 size-12 ${role.team === 'good' ? goodColor : evilColor}`} />
         <div className={`text-2xl font-bold ${role.team === 'good' ? goodColor : evilColor}`}>
-          {role.name}
+          {t(`role.${role.type}.name`)}
         </div>
         <div className="mt-2 flex items-center justify-center gap-1 text-sm text-slate-400">
           {role.team === 'good' ? (
@@ -48,26 +49,25 @@ export default function RoleReveal() {
           ) : (
             <Skull aria-hidden="true" className={`size-4 ${evilColor}`} />
           )}
-          <span>{role.team === 'good' ? '亚瑟阵营（好人）' : '莫德雷德阵营（坏人）'}</span>
+          <span>{t(role.team === 'good' ? 'team.good' : 'team.evil')}</span>
         </div>
         <div className="text-slate-300 text-sm mt-3 leading-relaxed">
-          {role.description}
+          {t(`role.${role.type}.description`)}
         </div>
       </div>
 
-      {/* 特殊视野信息 */}
       {vision.knownEvil.length > 0 && (
         <div className="p-4 bg-purple-900/30 rounded-lg border border-purple-500">
           <div className="mb-2 flex items-center justify-center gap-2 font-medium text-purple-400">
             <Eye aria-hidden="true" className="size-4" />
-            你看到的邪恶玩家：
+            {t('roleReveal.knownEvil')}
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
             {vision.knownEvil.map(id => {
               const p = gameState.players.find(pl => pl.id === id)!;
               return (
                 <span key={id} className="rounded bg-rose-900/50 px-2 py-1 text-sm text-rose-300">
-                  玩家{id} ({p.aiModel?.name || '人类'})
+                  {t('player.label', { id })} ({p.aiModel?.name || t('common.human')})
                 </span>
               );
             })}
@@ -79,14 +79,14 @@ export default function RoleReveal() {
         <div className="rounded-lg border border-sky-500 bg-sky-900/30 p-4">
           <div className="mb-2 flex items-center justify-center gap-2 font-medium text-sky-400">
             <Eye aria-hidden="true" className="size-4" />
-            梅林或莫甘娜（你需要分辨）：
+            {t('roleReveal.merlinOrMorgana')}
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
             {vision.knownMerlinOrMorgana.map(id => {
               const p = gameState.players.find(pl => pl.id === id)!;
               return (
                 <span key={id} className="rounded bg-sky-900/50 px-2 py-1 text-sm text-sky-300">
-                  玩家{id} ({p.aiModel?.name || '人类'})
+                  {t('player.label', { id })} ({p.aiModel?.name || t('common.human')})
                 </span>
               );
             })}
@@ -98,7 +98,7 @@ export default function RoleReveal() {
         <div className="rounded-lg border border-rose-500 bg-rose-900/30 p-4">
           <div className="mb-2 flex items-center justify-center gap-2 font-medium text-rose-400">
             <Handshake aria-hidden="true" className="size-4" />
-            你的邪恶同伴：
+            {t('roleReveal.teammates')}
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
             {vision.teammates.map(id => {
@@ -106,7 +106,7 @@ export default function RoleReveal() {
               const r = ROLES[p.role!];
               return (
                 <span key={id} className="rounded bg-rose-900/50 px-2 py-1 text-sm text-rose-300">
-                  玩家{id} ({r.name})
+                  {t('player.label', { id })} ({t(`role.${r.type}.name`)})
                 </span>
               );
             })}
@@ -114,15 +114,14 @@ export default function RoleReveal() {
         </div>
       )}
 
-      {/* 刺客随时开刀提示 */}
       {isAssassin && assassinAnytime && (
         <div className="rounded-lg border border-rose-500 bg-gradient-to-r from-rose-900/40 to-orange-900/40 p-4">
           <div className="mb-2 flex items-center gap-2 font-medium text-rose-400">
             <Swords aria-hidden="true" className="size-5" />
-            特殊规则：随时开刀
+            {t('roleReveal.anytimeTitle')}
           </div>
           <div className="text-sm text-rose-200/80">
-            本局开启了「随时开刀」规则！你可以在游戏任何时候点击右下角的刺客按钮来刺杀梅林，无需等待好人赢得3个任务。
+            {t('roleReveal.anytimeDescription')}
           </div>
         </div>
       )}
@@ -132,7 +131,7 @@ export default function RoleReveal() {
         onClick={handleContinue}
         className="w-full bg-amber-500 hover:bg-amber-600"
       >
-        确认，开始游戏 →
+        {t('roleReveal.continue')}
       </Button>
     </div>
   );
